@@ -4,7 +4,12 @@ include 'db.php';
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-$user_id = 1; // Replace later with session
+if(!isset($_SESSION['user_id'])){
+    header("Location: login.php");
+    exit;
+}
+
+$user_id = $_SESSION['user_id'];
 
 // Handle new complaint
 if(isset($_POST['submit'])){
@@ -168,7 +173,9 @@ document.addEventListener("DOMContentLoaded", function(){
 </head>
 <body>
 
-<header>Customer Portal - KCAU</header>
+<header>
+    Customer Portal - KCAU | Welcome <?php echo $_SESSION['user_name']; ?>
+</header>
 <div class="container">
 
 <h2>Track Complaint</h2>
