@@ -4,25 +4,45 @@ include 'db.php';
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-$user_id = 1; // Alice Customer
+$user_id = 1; // Replace later with session
 
+// Handle new complaint
 if(isset($_POST['submit'])){
     $title = trim($_POST['title']);
     $description = trim($_POST['description']);
+
     if($title != "" && $description != ""){
         $stmt = $conn->prepare("INSERT INTO complaints (user_id, title, description) VALUES (?, ?, ?)");
         $stmt->bind_param("iss", $user_id, $title, $description);
         $stmt->execute();
+
+        // Get last inserted ID (for ticket)
+        $ticket_id = $stmt->insert_id;
+        $ticket = "TICK-".str_pad($ticket_id,4,"0",STR_PAD_LEFT);
+
         $stmt->close();
-        echo "<script>alert('Complaint submitted successfully!');</script>";
+
+        echo "<script>alert('Complaint submitted! Your Ticket: $ticket');</script>";
     } else {
         echo "<script>alert('Enter a valid title and description');</script>";
     }
 }
 
+// Track complaint by ticket
+$search_result = null;
+if(isset($_GET['ticket'])){
+    $ticket_input = str_replace("TICK-", "", $_GET['ticket']);
+    $ticket_id = intval($ticket_input);
+
+    $search_sql = "SELECT * FROM complaints WHERE id=$ticket_id AND user_id=$user_id";
+    $search_result = mysqli_query($conn, $search_sql);
+}
+
+// Fetch user complaints
 $complaints_sql = "SELECT * FROM complaints WHERE user_id=$user_id ORDER BY date_created DESC";
 $complaints_result = mysqli_query($conn, $complaints_sql);
 
+// Fetch feedback
 $feedback_sql = "
     SELECT f.rating, f.comment, c.title AS complaint_title
     FROM feedback f
@@ -151,6 +171,28 @@ document.addEventListener("DOMContentLoaded", function(){
 <header>Customer Portal - KCAU</header>
 <div class="container">
 
+<h2>Track Complaint</h2>
+<form method="GET">
+    <label>Enter Ticket Number:</label>
+    <input type="text" name="ticket" placeholder="e.g. TICK-0001" required>
+    <input type="submit" value="Check Status">
+</form>
+
+<?php if($search_result && mysqli_num_rows($search_result) > 0){ 
+    $row = mysqli_fetch_assoc($search_result);
+?>
+<div style="margin-top:15px; padding:15px; background:#1f4068; border-radius:8px;">
+    <strong>Result:</strong><br>
+    Ticket: <?php echo "TICK-".str_pad($row['id'],4,"0",STR_PAD_LEFT); ?><br>
+    Title: <?php echo htmlspecialchars($row['title']); ?><br>
+    Status: <span class="status-<?php echo strtolower($row['status']); ?>">
+        <?php echo ucfirst($row['status']); ?>
+    </span>
+</div>
+<?php } elseif(isset($_GET['ticket'])){ ?>
+<p style="color:red;">No complaint found for that ticket.</p>
+<?php } ?>
+
 <h2>Submit Complaint</h2>
 <form method="POST">
     <label>Title:</label>
@@ -190,4 +232,24 @@ document.addEventListener("DOMContentLoaded", function(){
 
 </div>
 </body>
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+
+    // Confirm submit
+    const form = document.querySelector('form[method="POST"]');
+    form.addEventListener('submit', function(e){
+        if(!confirm('Submit this complaint now?')){
+            e.preventDefault();
+        }
+    });
+
+    // Auto uppercase ticket input
+    const ticketInput = document.querySelector('input[name="ticket"]');
+    if(ticketInput){
+        ticketInput.addEventListener('input', function(){
+            this.value = this.value.toUpperCase();
+        });
+    }
+});
+</script>
 </html>
