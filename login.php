@@ -21,7 +21,7 @@ if(isset($_POST['login'])){
             if(password_verify($password, $hashed)){
                 $_SESSION['user_id'] = $id;
                 $_SESSION['user_name'] = $name;
-                header("Location: test.php"); // Customer portal
+                header("Location: customer.php"); // Customer portal
                 exit;
             } else {
                 $message = "Incorrect password!";
@@ -111,10 +111,24 @@ a:hover {
     <?php if($message) echo "<div class='message'>$message</div>"; ?>
     <form method="POST">
         <input type="email" name="email" placeholder="Email" required>
-        <input type="password" name="password" placeholder="Password" required>
+       <input type="password" name="password" id="password" placeholder="Password" required>
+        <br>
+        <input type="checkbox" onclick="togglePassword()"> Show Password
+        <br>
         <input type="submit" name="login" value="Login">
     </form>
     <p>Don't have an account? <a href="register.php">Register here</a></p>
 </div>
 </body>
+<script>
+function togglePassword() {
+    let pass = document.getElementById("password");
+
+    if (pass.type === "password") {
+        pass.type = "text";
+    } else {
+        pass.type = "password";
+    }
+}
+</script>
 </html>
