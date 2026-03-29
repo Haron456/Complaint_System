@@ -26,140 +26,175 @@ if(isset($_POST['update'])){
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Staff Dashboard - KCAU Complaint System</title>
+<title>Staff Dashboard</title>
+
 <style>
-/* --- General Styles --- */
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #1a1a2e;
-    color: #f0f0f0;
+    font-family: 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #0b1e3c, #001233);
+    color: #f1f5f9;
     margin: 0;
-    padding: 0;
-}
-header {
-    background-color: #003379;
-    color: #FFD700;
-    text-align: center;
-    padding: 15px 0;
-    font-size: 26px;
-    font-weight: bold;
-}
-.container {
-    width: 90%;
-    max-width: 1200px;
-    margin: 20px auto;
-    background-color: #162447;
-    padding: 20px;
-    border-radius: 10px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-}
-h2 {
-    color: #FFD700;
-    margin-bottom: 15px;
 }
 
-/* --- Table Styles --- */
+/* HEADER */
+.header {
+    text-align: center;
+    padding: 20px;
+}
+.logo {
+    width: 80px;
+}
+.header h1 {
+    color: #FFD700;
+    margin-top: 10px;
+}
+
+
+
+/* SECTION TITLES */
+h2 {
+    color: #FFD700;
+    border-bottom: 2px solid #FFD700;
+    padding-bottom: 5px;
+    margin-top: 30px;
+}
+
+/* TABLE */
 table {
     width: 100%;
     border-collapse: collapse;
-}
-th, td {
-    padding: 12px;
-    border: 1px solid #444;
-    text-align: left;
-}
-th {
-    background-color: #003379;
-    color: #FFD700;
-}
-tr:nth-child(even) {
-    background-color: #1f4068;
+    margin-top: 20px;
 }
 
+th {
+    background: #FFD700;
+    color: #001233;
+    padding: 12px;
+}
+
+td {
+    padding: 12px;
+    border-bottom: 1px solid #1e3a5f;
+}
+
+tr:hover {
+    background: rgba(255,215,0,0.05);
+}
+
+/* STATUS COLORS */
 .status-pending {
     color: #FFD700;
-    font-weight: 600;
+    font-weight: bold;
 }
+
 .status-resolved {
     color: #00ff99;
-    font-weight: 600;
+    font-weight: bold;
 }
 
-select, input[type="submit"] {
-    padding: 6px 10px;
+/* FORM ELEMENTS */
+select {
+    padding: 6px;
     border-radius: 5px;
-    border: none;
-    cursor: pointer;
+    border: 1px solid #1e3a5f;
+    background: #0b1e3c;
+    color: white;
 }
+
+/* BUTTON */
 input[type="submit"] {
-    background-color: #003379;
-    color: #FFD700;
+    margin-top: 2px;
+    background: #FFD700;
+    color: #001233;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
     transition: 0.3s;
 }
+
 input[type="submit"]:hover {
-    background-color: #FFD700;
-    color: #003379;
+    background: #e6c200;
+    box-shadow: 0 0 8px rgba(255,215,0,0.6);
 }
 
-/* --- Responsive --- */
-@media(max-width: 768px){
+/* SMALL FORM INSIDE TABLE */
+table form {
+    display: flex;
+    gap: 5px;
+}
+
+/* RESPONSIVE */
+@media(max-width:768px){
     th, td { font-size: 14px; padding: 8px; }
-    header { font-size: 20px; }
+    .header h1 { font-size: 20px; }
 }
 </style>
-</head>
-<body>
-
-<header>Staff Dashboard - KCAU Complaint System</header>
-
-<div class="container">
-<h2>All Complaints</h2>
-<table>
-<tr>
-    <th>ID</th>
-    <th>User</th>
-    <th>Title</th>
-    <th>Description</th>
-    <th>Status</th>
-    <th>Date</th>
-    <th>Action</th>
-</tr>
-
-<?php while($row=mysqli_fetch_assoc($complaints_result)){ ?>
-<tr>
-    <td><?php echo $row['id']; ?></td>
-    <td><?php echo $row['user_name']; ?></td>
-    <td><?php echo $row['title']; ?></td>
-    <td><?php echo nl2br($row['description']); ?></td>
-    <td class="status-<?php echo strtolower($row['status']); ?>"><?php echo ucfirst($row['status']); ?></td>
-    <td><?php echo $row['date_created']; ?></td>
-    <td>
-        <form method="POST" class="status-form">
-            <input type="hidden" name="id" value="<?php echo $row['id']; ?>">
-            <select name="status">
-                <option value="pending" <?php if($row['status']=='pending') echo 'selected'; ?>>Pending</option>
-                <option value="resolved" <?php if($row['status']=='resolved') echo 'selected'; ?>>Resolved</option>
-            </select>
-            <input type="submit" name="update" value="Update">
-        </form>
-    </td>
-</tr>
-<?php } ?>
-
-</table>
-</div>
 
 <script>
-// Confirm before updating status
-document.querySelectorAll('.status-form').forEach(form => {
-    form.addEventListener('submit', function(e){
-        let select = form.querySelector('select[name="status"]');
-        if(!confirm(`Are you sure you want to change status to "${select.value}"?`)){
-            e.preventDefault();
+document.addEventListener("DOMContentLoaded", function(){
+    document.querySelectorAll('form').forEach(form => {
+        if(form.querySelector('select[name="status"]')){
+            form.addEventListener('submit', function(e){
+                let status = form.querySelector('select[name="status"]').value;
+                if(!confirm(`Mark this complaint as "${status}"?`)){
+                    e.preventDefault();
+                }
+            });
         }
     });
 });
 </script>
+
+</head>
+<body>
+
+<div class="header">
+    <img src="KCA_UNIVERSITY_LOGO.png" class="logo">
+    <h1>KCA Staff Dashboard</h1>
+</div>
+
+<div class="container">
+
+<h2>All Complaints</h2>
+
+<table>
+<tr>
+<th>ID</th>
+<th>User</th>
+<th>Title</th>
+<th>Description</th>
+<th>Status</th>
+<th>Date</th>
+<th>Action</th>
+</tr>
+
+<?php while($row=mysqli_fetch_assoc($complaints_result)){ ?>
+<tr>
+<td><?php echo $row['id']; ?></td>
+<td><?php echo htmlspecialchars($row['user_name']); ?></td>
+<td><?php echo htmlspecialchars($row['title']); ?></td>
+<td><?php echo nl2br(htmlspecialchars($row['description'])); ?></td>
+<td class="status-<?php echo strtolower($row['status']); ?>">
+    <?php echo ucfirst($row['status']); ?>
+</td>
+<td><?php echo $row['date_created']; ?></td>
+<td>
+<form method="POST">
+<input type="hidden" name="id" value="<?php echo $row['id']; ?>">
+<select name="status">
+<option value="pending" <?php if($row['status']=='pending') echo 'selected'; ?>>Pending</option>
+<option value="resolved" <?php if($row['status']=='resolved') echo 'selected'; ?>>Resolved</option>
+</select>
+<input type="submit" name="update" value="Update">
+</form>
+</td>
+</tr>
+<?php } ?>
+</table>
+
+</div>
 
 </body>
 </html>

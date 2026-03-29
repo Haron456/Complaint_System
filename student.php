@@ -63,100 +63,118 @@ $feedback_result = mysqli_query($conn, $feedback_sql);
 <head>
 <meta charset="UTF-8">
 <title>Student Portal</title>
+
 <style>
 /* Base */
 body {
-    font-family: 'Roboto', sans-serif;
-    background: #1a1a2e;
-    color: #f0f0f0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #0a0f2c, #111a3a);
+    color: #fff;
     margin: 0;
     padding: 0;
 }
-header {
-    background: #003379;
+
+/* Header */
+.header {
+    background: #0d2a66;
     padding: 20px;
     text-align: center;
-    color: #FFD700;
-    font-size: 28px;
-    font-weight: bold;
-    letter-spacing: 1px;
-}
-.container {
-    width: 90%;
-    max-width: 1000px;
-    margin: 30px auto;
-    background: #162447;
-    padding: 25px;
-    border-radius: 10px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    border-bottom: 3px solid gold;
 }
 
-/* Form */
-form label {
-    display: block;
-    margin: 10px 0 5px;
-    font-weight: 500;
+.header h1 {
+    margin: 0;
+    color: gold;
 }
-input[type="text"], textarea {
+
+.username {
+    color: #ffd700cc;
+    font-size: 18px;
+    margin-top: 5px;
+}
+
+/* Main container */
+.container {
+    width: 60%;
+    margin: 40px auto;
+    background: #162447;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0px 0px 20px rgba(0,0,0,0.5);
+}
+
+/* Section titles */
+h2 {
+    color: gold;
+    border-bottom: 2px solid gold;
+    padding-bottom: 5px;
+}
+
+/* Inputs */
+input, textarea {
     width: 100%;
-    padding: 10px;
-    border-radius: 5px;
-    border: 1px solid #444;
-    background: #1f4068;
-    color: #f0f0f0;
-}
-input[type="submit"] {
-    background: #003379;
-    color: #FFD700;
+    padding: 12px;
+    margin-top: 10px;
+    margin-bottom: 15px;
+    border-radius: 8px;
     border: none;
+    outline: none;
+    background: #1f4068;
+    color: white;
+}
+
+input::placeholder,
+textarea::placeholder {
+    color: #bbb;
+}
+
+/* Buttons */
+button {
+    background: gold;
+    color: #000;
     padding: 10px 20px;
-    border-radius: 5px;
+    border: none;
+    border-radius: 8px;
     cursor: pointer;
+    font-weight: bold;
     transition: 0.3s;
 }
-input[type="submit"]:hover {
-    background: #FFD700;
-    color: #003379;
+
+button:hover {
+    background: #ffd700cc;
+    transform: scale(1.05);
 }
 
-/* Tables */
+/* Complaint table */
 table {
     width: 100%;
     border-collapse: collapse;
     margin-top: 20px;
 }
-th, td {
-    padding: 12px;
-    border: 1px solid #444;
+
+table th, table td {
+    padding: 10px;
+    border-bottom: 1px solid #ccc;
     text-align: left;
 }
-th {
-    background: #003379;
-    color: #FFD700;
-}
-tr:nth-child(even) {
+
+table th {
     background: #1f4068;
+    color: gold;
 }
 .status-pending {
-    color: #FFD700;
+    color: orange;
     font-weight: bold;
 }
+
 .status-resolved {
-    color: #00ff99;
+    color: limegreen;
     font-weight: bold;
 }
 
-/* Hover effect */
-tr:hover {
-    background: #2c3e50;
-}
-
-/* Section titles */
-h2 {
-    color: #FFD700;
-    margin-top: 30px;
-    border-bottom: 2px solid #FFD700;
-    padding-bottom: 5px;
+.status-rejected {
+    color: red;
+    font-weight: bold;
 }
 </style>
 <script>
@@ -172,22 +190,20 @@ document.addEventListener("DOMContentLoaded", function(){
 </script>
 </head>
 <body>
-
-<header>
-    Student Portal - KCAU | Welcome 
-    <br>
-    <br>
-    <?php echo $_SESSION['user_name']; ?>
-    <br>
-    <bt>
-</header>
+<div class="header">
+    <img src="KCA_UNIVERSITY_LOGO.png" class="logo">
+    <h2>KCA COMPLAINT SYSTEM</h2>
+    <div class="username">
+        Student Portal - KCAU |<br> Welcome <?php echo $_SESSION['user_name']; ?>
+    </div>
+</div>
 <div class="container">
 
 <h2>Track Complaint</h2>
 <form method="GET">
     <label>Enter Ticket Number:</label>
     <input type="text" name="ticket" placeholder="e.g. TICK-0001" required>
-    <input type="submit" value="Check Status">
+    <button type="submit">Check Status</button>
 </form>
 
 <?php if($search_result && mysqli_num_rows($search_result) > 0){ 
