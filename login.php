@@ -19,9 +19,11 @@ if(isset($_POST['login'])){
         if($stmt->num_rows > 0){
             $stmt->fetch();
             if(password_verify($password, $hashed)){
+                session_regenerate_id(true);
+
                 $_SESSION['user_id'] = $id;
                 $_SESSION['user_name'] = $name;
-                header("Location: customer.php"); // Customer portal
+                header("Location: student.php"); // Customer portal
                 exit;
             } else {
                 $message = "Incorrect password!";
@@ -37,6 +39,7 @@ if(isset($_POST['login'])){
 ?>
 <!DOCTYPE html>
 <html lang="en">
+    
 <head>
 <meta charset="UTF-8">
 <title>Login - KCAU Portal</title>

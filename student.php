@@ -62,7 +62,7 @@ $feedback_result = mysqli_query($conn, $feedback_sql);
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Customer Portal</title>
+<title>Student Portal</title>
 <style>
 /* Base */
 body {
@@ -174,7 +174,12 @@ document.addEventListener("DOMContentLoaded", function(){
 <body>
 
 <header>
-    Customer Portal - KCAU | Welcome <?php echo $_SESSION['user_name']; ?>
+    Student Portal - KCAU | Welcome 
+    <br>
+    <br>
+    <?php echo $_SESSION['user_name']; ?>
+    <br>
+    <bt>
 </header>
 <div class="container">
 
