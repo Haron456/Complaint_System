@@ -1,14 +1,11 @@
 <?php
-$servername = "localhost";
-$username = "root";
-$password = "";
-$database = "complaint_system";
+$host = "localhost";
+$user = "root";        // default XAMPP user
+$password = "";        // default XAMPP password
+$dbname = "complaint_system";
 
-// Create connection
-$conn = mysqli_connect($servername, $username, $password, $database);
-
-// Check connection
-if (!$conn) {
-    die("Connection failed: " . mysqli_connect_error());
+$conn = new mysqli($host, $user, $password, $dbname);
+if($conn->connect_error){
+    die("Connection failed: " . $conn->connect_error);
 }
 ?>
