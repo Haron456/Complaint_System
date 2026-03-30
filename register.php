@@ -9,12 +9,13 @@ if(isset($_POST['register'])){
     $name = trim($_POST['name']);
     $email = trim($_POST['email']);
     $password = trim($_POST['password']);
-    $confirm_password = trim($_POST['confirm_password']); // added
+    $confirm_password = trim($_POST['confirm_password']);
+    $role = $_POST['role']; // handle role
 
-    //  Check if all fields are filled
-    if($name && $email && $password && $confirm_password){
+    // Check if all fields are filled
+    if($name && $email && $password && $confirm_password && $role){
 
-        //  Check if passwords match
+        // Check if passwords match
         if($password !== $confirm_password){
             $message = "Passwords do not match!";
         } else {
@@ -29,8 +30,8 @@ if(isset($_POST['register'])){
                 $message = "Email already registered!";
             } else {
                 $hashed = password_hash($password, PASSWORD_DEFAULT);
-                $stmt = $conn->prepare("INSERT INTO users (name, email, password) VALUES (?, ?, ?)");
-                $stmt->bind_param("sss", $name, $email, $hashed);
+                $stmt = $conn->prepare("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)");
+                $stmt->bind_param("ssss", $name, $email, $hashed, $role);
                 $stmt->execute();
                 $stmt->close();
                 $message = "Registration successful! You can now login.";
@@ -222,6 +223,16 @@ a:hover {
             <label>Confirm Password</label>
         </div>
 
+
+        <div class="input-group">
+    <select name="role" required>
+        <option value="">--Select Role--</option>
+        <option value="student">Student</option>
+        <option value="staff">Staff</option>
+        <option value="admin">Admin</option>
+    </select>
+    <label>Role</label>
+</div>
         <div class="toggle">
             <input type="checkbox" onclick="togglePassword()">
             <span>Show Password</span>

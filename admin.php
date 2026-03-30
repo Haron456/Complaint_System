@@ -1,4 +1,10 @@
 <?php
+session_start();
+if(!isset($_SESSION['role']) || $_SESSION['role'] != 'admin'){ 
+    header("Location: login.php"); 
+    exit; 
+}
+
 include 'db.php';
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
@@ -251,6 +257,8 @@ ID <?php echo $frow['id']; ?> - <?php echo htmlspecialchars($frow['title']); ?> 
 </form>
 
 </div>
-
+<form method="POST" action="logout.php" style="text-align:right; margin:10px;">
+    <button type="submit">Logout</button>
+</form>
 </body>
 </html>

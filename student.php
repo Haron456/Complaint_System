@@ -1,4 +1,11 @@
 <?php
+
+session_start();
+if(!isset($_SESSION['role']) || $_SESSION['role'] != 'student'){ 
+    header("Location: login.php"); 
+    exit; 
+}
+
 session_start();
 include 'db.php';
 error_reporting(E_ALL);
@@ -259,6 +266,9 @@ document.addEventListener("DOMContentLoaded", function(){
 <?php } else { echo "<p>No feedback yet.</p>"; } ?>
 
 </div>
+<form method="POST" action="logout.php" style="text-align:right; margin:10px;">
+    <button type="submit">Logout</button>
+</form>
 </body>
 <script>
 document.addEventListener("DOMContentLoaded", function(){

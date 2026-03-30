@@ -6,40 +6,64 @@ ini_set('display_errors', 1);
 
 $message = "";
 
+// Check if login form submitted
 if(isset($_POST['login'])){
     $email = trim($_POST['email']);
     $password = trim($_POST['password']);
 
     if($email && $password){
-        $stmt = $conn->prepare("SELECT id, password, name FROM users WHERE email=?");
+        // Prepare statement to prevent SQL injection
+        $stmt = $conn->prepare("SELECT id, password, name, role FROM users WHERE email=?");
         $stmt->bind_param("s", $email);
         $stmt->execute();
-        $stmt->store_result();
-        $stmt->bind_result($id, $hashed, $name);
+        $stmt->bind_result($id, $hashed, $name, $role);
 
-        if($stmt->num_rows > 0){
-            $stmt->fetch();
+        // Fetch row and check
+        if($stmt->fetch()){
+            $role = strtolower(trim($role)); // normalize role to lowercase, remove spaces
+
+            // Verify password
             if(password_verify($password, $hashed)){
-                session_regenerate_id(true);
+                session_regenerate_id(true); // Prevent session hijacking
 
                 $_SESSION['user_id'] = $id;
                 $_SESSION['user_name'] = $name;
+                $_SESSION['role'] = $role;
 
-                header("Location: student.php");
+                // Role-based redirection
+                switch($role){
+                    case 'student':
+                        header("Location: student.php");
+                        break;
+                    case 'staff':
+                        header("Location: staff.php");
+                        break;
+                    case 'admin':
+                        header("Location: admin.php");
+                        break;
+                    default:
+                        session_unset();
+                        session_destroy();
+                        $message = "Invalid user role!";
+                        break;
+                }
                 exit;
+
             } else {
                 $message = "Incorrect password!";
             }
+
         } else {
             $message = "Email not registered!";
         }
+
         $stmt->close();
+
     } else {
         $message = "Fill all fields!";
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>

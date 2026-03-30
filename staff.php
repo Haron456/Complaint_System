@@ -1,4 +1,11 @@
 <?php
+
+session_start();
+if(!isset($_SESSION['role']) || $_SESSION['role'] != 'staff'){ 
+    header("Location: login.php"); 
+    exit; 
+}
+
 include 'db.php';
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
@@ -20,6 +27,7 @@ if(isset($_POST['update'])){
     header("Location: staff.php");
     exit;
 }
+
 ?>
 
 <!DOCTYPE html>
@@ -195,6 +203,8 @@ document.addEventListener("DOMContentLoaded", function(){
 </table>
 
 </div>
-
+<form method="POST" action="logout.php" style="text-align:right; margin:10px;">
+    <button type="submit">Logout</button>
+</form>
 </body>
 </html>
