@@ -1,17 +1,12 @@
 <?php
 session_start();
+
+// If already logged in, redirect to their portal
 if(isset($_SESSION['role'])){
-    // If already logged in, redirect to their dashboard
     switch($_SESSION['role']){
-        case 'admin':
-            header("Location: admin.php");
-            exit;
-        case 'staff':
-            header("Location: staff.php");
-            exit;
-        case 'student':
-            header("Location: student.php");
-            exit;
+        case 'admin': header("Location: admin.php"); exit;
+        case 'staff': header("Location: staff.php"); exit;
+        case 'student': header("Location: student.php"); exit;
     }
 }
 ?>
@@ -34,6 +29,7 @@ body {
     margin: 0;
 }
 
+/* HEADER */
 .header {
     text-align: center;
     padding: 40px 20px 20px 20px;
@@ -59,34 +55,41 @@ h2.page-login{
     color: #FFD700;
     margin: 10px 0 20px 0;
     text-align: center;
-        }
+}
 
+/* BUTTONS */
 .button-container {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 15px;
+    gap: 20px;
     margin-bottom: 50px;
 }
 
-button {
-    width: 220px;
+.button-container a {
+    text-decoration: none;
+    width: 240px;
+}
+
+.button-container button {
+    width: 100%;
     padding: 15px;
     font-size: 16px;
     font-weight: bold;
     color: #001233;
-    background: #FFD700;
+    background: linear-gradient(135deg, #FFD700, #e6c200);
     border: none;
-    border-radius: 6px;
+    border-radius: 10px;
     cursor: pointer;
-    transition: 0.3s;
+    transition: all 0.3s ease;
 }
 
-button:hover {
-    background: #e6c200;
-    box-shadow: 0 0 12px rgba(255, 215, 0, 0.6);
+.button-container button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
 }
 
+/* FOOTER */
 footer {
     text-align: center;
     padding: 15px;
@@ -111,11 +114,9 @@ footer {
 <h2 class="page-login">Login HERE</h2>
 
 <div class="button-container">
-    <form action="login.php" method="get">
-        <button type="submit" name="role" value="admin">Admin Portal</button>
-        <button type="submit" name="role" value="staff">Staff Portal</button>
-        <button type="submit" name="role" value="student">Student Portal</button>
-    </form>
+    <a href="login.php?role=admin"><button>Admin Portal</button></a>
+    <a href="login.php?role=staff"><button>Staff Portal</button></a>
+    <a href="login.php?role=student"><button>Student Portal</button></a>
 </div>
 
 <footer>
@@ -124,3 +125,5 @@ footer {
 
 </body>
 </html>
+
+

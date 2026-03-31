@@ -1,125 +1,208 @@
- KCA Complaint Management System
 
-Overview
 
-This is a **web-based complaint management system** built using **PHP and MySQL**.
-It allows students to submit complaints, track their status using ticket numbers, and receive feedback from the admin.
+# KCA Complaint Management System
+
+## Overview
+
+The KCA Complaint Management System is a web-based application developed using PHP and MySQL.
+It is designed to improve how complaints are submitted, managed, and resolved within an institution.
+
+The system provides a structured workflow where students can submit complaints, staff can manage them, and administrators can respond with feedback and notifications.
 
 ---
 
- Features
+## Features
 
- Student (User)
+### Student (User)
 
-* Register and login securely
+* Secure registration and login
 * Submit complaints
-* Automatically generate ticket numbers (e.g. `TICK-0001`)
+* Automatic ticket generation (e.g., TICK-0001)
 * Track complaint status
-* View feedback from admin
+* View admin feedback
+* Submit ratings and comments
 
-Admin
+---
+
+### Staff
 
 * View all complaints
 * Update complaint status (Pending / Resolved)
-* Submit feedback with rating and comments
 
 ---
 
- System Requirements
+### Admin
 
-Make sure you have the following installed:
+* View all complaints
+* Update complaint status
+* Provide feedback (comments)
+* Send email notifications to users
+* View student ratings and comments
+* Dashboard with analytics:
 
-* **PHP Version:** 7.4 or higher
-* **MySQL Version:** 5.7 or higher
-* **Web Server:** Apache (XAMPP recommended)
-
----
-
-Database Setup
-
-1. Open **phpMyAdmin**
-
-2. Create a new database:
-
-   ```
-   complaint_system
-   ```
-
-3. Import the SQL file included in this project:
-
-   * File: `complaint_system.sql` (or the one in your repo)
-   * Steps:
-
-     * Click your database
-     * Go to **Import**
-     * Choose the `.sql` file
-     * Click **Go**
-
-This will create the required tables:
-
-* `users`
-* `complaints`
-* `feedback`
+  * Total complaints
+  * Complaints by status
+  * Feedback count
+  * Average response time
 
 ---
 
-How to Run the System
+## System Requirements
 
-1. Start **Apache** and **MySQL** in XAMPP
+* PHP 7.4 or higher
+* MySQL 5.7 or higher
+* Apache Web Server (XAMPP recommended)
+* Composer (for PHPMailer)
+
+---
+
+## Database Setup
+
+1. Open phpMyAdmin
+2. Create a database named:
+
+```
+complaint_system
+```
+
+3. Import the SQL file provided in the project:
+
+* Select the database
+* Click "Import"
+* Choose the `.sql` file
+* Click "Go"
+
+---
+
+## Database Tables
+
+The system includes the following tables:
+
+* users
+* complaints
+* feedback
+* super_admin
+* super_staff
+
+Note: If your code references additional tables (e.g., staff_codes), ensure they exist or update the code accordingly.
+
+---
+
+## Installation
+
+1. Start Apache and MySQL in XAMPP
 
 2. Copy the project folder into:
 
-   ```
-   C:\xampp\htdocs\
-   ```
+```
+C:\xampp\htdocs\
+```
 
-3. Open your browser and go to:
+3. Open your browser and navigate to:
 
-   ```
-   http://localhost/your-folder-name/
-   ```
-
----
-
-Configuration
-
-Open `db.php` and make sure it matches your database:
-
-```php
-$conn = new mysqli($host, $user, $password, $dbname);
+```
+http://localhost/your-folder-name/
 ```
 
 ---
 
-Default Access
+## Configuration
 
- You can register a new account from the system
- Admin access depends on how you set it up (can be extended)
+Open `db.php` and configure your database connection:
+
+```php
+$conn = new mysqli("localhost", "root", "", "complaint_system");
+```
 
 ---
 
- Project Structure
+## Email Configuration (PHPMailer)
+
+To enable email notifications:
+
+1. Install PHPMailer using Composer:
+
+```
+composer require phpmailer/phpmailer
+```
+
+2. Update email credentials in `admin.php`:
+
+```php
+$mail->Username = 'your-email@gmail.com';
+$mail->Password = 'your-app-password';
+```
+
+Important:
+
+* Use a Gmail App Password, not your actual password
+* Ensure SMTP settings are correct
+
+---
+
+## Project Structure
 
 ```
 /project-folder
 │── login.php
 │── register.php
 │── student.php
+│── staff.php
 │── admin.php
+│── logout.php
 │── db.php
 │── complaint_system.sql
-│── logo.png
+│── /vendor
+│── /assets
 ```
 
+---
 
-NB:  To access other portal like staff and admin you have to search it as (admin.php)
-      and you must  login first or register to acccess the student portal 
-      For now the admin and the staff have no login or register page 
+## Common Issues
 
+### Too Many Redirects
 
- Notes
+* Ensure session roles are correctly set
+* Clear browser cookies
+* Verify login redirection logic
 
-* Ensure XAMPP is running before accessing the system
-* Import the database before use
-* Update database credentials if needed
+---
 
+### Missing Table Error
+
+Example:
+
+```
+Table 'complaint_system.staff_codes' doesn't exist
+```
+
+Solution:
+
+* Re-import the SQL file
+* Or create the missing table
+* Or update the code to match existing tables
+
+---
+
+### Email Not Sending
+
+* Check internet connection
+* Verify SMTP credentials
+* Ensure App Password is used
+* Confirm Composer dependencies are installed
+
+---
+
+## Notes
+
+* Always start Apache and MySQL before running the system
+* Import the database before accessing the application
+* Keep credentials secure
+
+---
+
+## Author
+
+MUNGA BRANDON BILLY-- Student at  KCA University
+
+---

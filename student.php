@@ -1,76 +1,105 @@
 <?php
-
-session_start();
-if(!isset($_SESSION['role']) || $_SESSION['role'] != 'student'){ 
-    header("Location: login.php"); 
-    exit; 
-}
-
 session_start();
 include 'db.php';
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-if(!isset($_SESSION['user_id'])){
-    header("Location: login.php");
+// --------------------
+// Redirect if not logged in as student
+// --------------------
+if(!isset($_SESSION['role']) || $_SESSION['role'] !== 'student'){
+    header("Location: login.php?role=student");
     exit;
 }
 
-$user_id = $_SESSION['user_id'];
+// Set user_id and user_name safely
+$user_id = intval($_SESSION['user_id'] ?? 0);
+$user_name = htmlspecialchars($_SESSION['user_name'] ?? '');
 
+// --------------------
 // Handle new complaint
+// --------------------
 if(isset($_POST['submit'])){
     $title = trim($_POST['title']);
     $description = trim($_POST['description']);
 
-    if($title != "" && $description != ""){
+    if($title !== "" && $description !== ""){
         $stmt = $conn->prepare("INSERT INTO complaints (user_id, title, description) VALUES (?, ?, ?)");
         $stmt->bind_param("iss", $user_id, $title, $description);
         $stmt->execute();
 
-        // Get last inserted ID (for ticket)
         $ticket_id = $stmt->insert_id;
         $ticket = "TICK-".str_pad($ticket_id,4,"0",STR_PAD_LEFT);
-
         $stmt->close();
 
-        echo "<script>alert('Complaint submitted! Your Ticket: $ticket');</script>";
+        echo "<script>alert('Complaint submitted! Your Ticket: $ticket'); window.location.href='student.php';</script>";
+        exit;
     } else {
         echo "<script>alert('Enter a valid title and description');</script>";
     }
 }
 
-// Track complaint by ticket
-$search_result = null;
-if(isset($_GET['ticket'])){
-    $ticket_input = str_replace("TICK-", "", $_GET['ticket']);
-    $ticket_id = intval($ticket_input);
+// --------------------
+// Handle student feedback
+// --------------------
+if(isset($_POST['submit_student_feedback'])){
+    $feedback_id = intval($_POST['feedback_id']);
+    $rating = intval($_POST['rating']);
+    $comment = trim($_POST['comment']);
 
-    $search_sql = "SELECT * FROM complaints WHERE id=$ticket_id AND user_id=$user_id";
-    $search_result = mysqli_query($conn, $search_sql);
+    $stmt = $conn->prepare("UPDATE feedback SET student_rating=?, student_comment=? WHERE id=?");
+    $stmt->bind_param("isi", $rating, $comment, $feedback_id);
+    $stmt->execute();
+    $stmt->close();
+
+    echo "<script>alert('Your feedback has been submitted!'); window.location.href='student.php';</script>";
+    exit;
 }
 
+// --------------------
+// Track complaint by ticket
+// --------------------
+$search_result = null;
+if(isset($_GET['ticket'])){
+    $ticket_input = str_replace("TICK-", "", strtoupper($_GET['ticket']));
+    $ticket_id = intval($ticket_input);
+
+    $stmt = $conn->prepare("SELECT * FROM complaints WHERE id=? AND user_id=?");
+    $stmt->bind_param("ii", $ticket_id, $user_id);
+    $stmt->execute();
+    $search_result = $stmt->get_result();
+    $stmt->close();
+}
+
+// --------------------
 // Fetch user complaints
-$complaints_sql = "SELECT * FROM complaints WHERE user_id=$user_id ORDER BY date_created DESC";
-$complaints_result = mysqli_query($conn, $complaints_sql);
+// --------------------
+$stmt = $conn->prepare("SELECT * FROM complaints WHERE user_id=? ORDER BY date_created DESC");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$complaints_result = $stmt->get_result();
+$stmt->close();
 
+// --------------------
 // Fetch feedback
-$feedback_sql = "
-    SELECT f.rating, f.comment, c.title AS complaint_title
+// --------------------
+$stmt = $conn->prepare("
+    SELECT f.id AS feedback_id, f.admin_comment, f.student_rating, f.student_comment, c.title AS complaint_title
     FROM feedback f
-    INNER JOIN complaints c ON f.complaint_id=c.id
-    WHERE c.user_id=$user_id
+    INNER JOIN complaints c ON f.complaint_id = c.id
+    WHERE c.user_id=?
     ORDER BY f.id DESC
-";
-$feedback_result = mysqli_query($conn, $feedback_sql);
+");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$feedback_result = $stmt->get_result();
+$stmt->close();
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <title>Student Portal</title>
-
 <style>
 /* Base */
 body {
@@ -169,43 +198,122 @@ table th {
     background: #1f4068;
     color: gold;
 }
-.status-pending {
-    color: orange;
-    font-weight: bold;
+
+.status-pending { color: orange; font-weight: bold; }
+.status-resolved { color: limegreen; font-weight: bold; }
+.status-rejected { color: red; font-weight: bold; }
+
+/* LOGOUT BUTTON - BOTTOM RIGHT POWER STYLE */
+.logout-form {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
 }
 
-.status-resolved {
-    color: limegreen;
+.logout-form button {
+    background: linear-gradient(135deg, #FFD700, #e6c200);
+    color: #001233;
+    border: none;
+    padding: 12px 18px;
+    border-radius: 10px;
     font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+    transition: all 0.3s ease;
 }
 
-.status-rejected {
-    color: red;
+.logout-form button:hover {
+    transform: scale(1.08);
+    box-shadow: 0 0 25px rgba(255, 215, 0, 0.9);
+}
+
+.logout-form button:active {
+    transform: scale(0.95);
+}
+
+/* Fancy form input group */
+.fancy-form .input-group {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.fancy-form .input-group input,
+.fancy-form .input-group textarea {
+    width: 100%;
+    padding: 14px 12px;
+    border-radius: 10px;
+    border: 1px solid #1f4068;
+    background: #0b1e3c;
+    color: #fff;
+    outline: none;
+    transition: all 0.3s ease;
+    resize: none;
+}
+
+.fancy-form .input-group input:focus,
+.fancy-form .input-group textarea:focus {
+    border-color: #FFD700;
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+.fancy-form .input-group label {
+    position: absolute;
+    top: 14px;
+    left: 12px;
+    color: #9ca3af;
+    font-size: 14px;
+    pointer-events: none;
+    background: transparent;
+    transition: all 0.3s ease;
+}
+
+.fancy-form .input-group input:focus + label,
+.fancy-form .input-group input:valid + label,
+.fancy-form .input-group textarea:focus + label,
+.fancy-form .input-group textarea:valid + label {
+    top: -8px;
+    left: 10px;
+    background: #162447;
+    padding: 0 6px;
+    font-size: 12px;
+    color: #FFD700;
+}
+
+/* Fancy submit button */
+.fancy-form .fancy-btn {
+    width: 100%;
+    padding: 14px;
+    border-radius: 12px;
+    border: none;
+    background: linear-gradient(135deg, #FFD700, #e6c200);
+    color: #001233;
     font-weight: bold;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+}
+
+.fancy-form .fancy-btn:hover {
+    background: linear-gradient(135deg, #ffe566, #e6c200);
+    transform: scale(1.05);
+    box-shadow: 0 0 25px rgba(255, 215, 0, 0.9);
+}
+
+.fancy-form .fancy-btn:active {
+    transform: scale(0.95);
 }
 </style>
-<script>
-// Optional: confirm before submitting
-document.addEventListener("DOMContentLoaded", function(){
-    const form = document.querySelector('form');
-    form.addEventListener('submit', function(e){
-        if(!confirm('Submit this complaint now?')){
-            e.preventDefault();
-        }
-    });
-});
-</script>
 </head>
 <body>
+
 <div class="header">
     <img src="KCA_UNIVERSITY_LOGO.png" class="logo">
-    <h2>KCA COMPLAINT SYSTEM</h2>
-    <div class="username">
-        Student Portal - KCAU |<br> Welcome <?php echo $_SESSION['user_name']; ?>
-    </div>
+    <h1>KCA Complaint System</h1>
+    <div class="username">Welcome <?php echo $user_name; ?></div>
 </div>
-<div class="container">
 
+<div class="container">
 <h2>Track Complaint</h2>
 <form method="GET">
     <label>Enter Ticket Number:</label>
@@ -214,27 +322,31 @@ document.addEventListener("DOMContentLoaded", function(){
 </form>
 
 <?php if($search_result && mysqli_num_rows($search_result) > 0){ 
-    $row = mysqli_fetch_assoc($search_result);
-?>
+    $row = mysqli_fetch_assoc($search_result); ?>
 <div style="margin-top:15px; padding:15px; background:#1f4068; border-radius:8px;">
     <strong>Result:</strong><br>
     Ticket: <?php echo "TICK-".str_pad($row['id'],4,"0",STR_PAD_LEFT); ?><br>
     Title: <?php echo htmlspecialchars($row['title']); ?><br>
-    Status: <span class="status-<?php echo strtolower($row['status']); ?>">
-        <?php echo ucfirst($row['status']); ?>
-    </span>
+    Status: <span class="status-<?php echo strtolower($row['status']); ?>"><?php echo ucfirst($row['status']); ?></span>
 </div>
 <?php } elseif(isset($_GET['ticket'])){ ?>
 <p style="color:red;">No complaint found for that ticket.</p>
 <?php } ?>
 
 <h2>Submit Complaint</h2>
-<form method="POST">
-    <label>Title:</label>
-    <input type="text" name="title" required>
-    <label>Description:</label>
-    <textarea name="description" rows="4" required></textarea>
-    <input type="submit" name="submit" value="Submit Complaint">
+<form method="POST" class="fancy-form">
+
+    <div class="input-group">
+        <input type="text" name="title" required>
+        <label>Title</label>
+    </div>
+
+    <div class="input-group">
+        <textarea name="description" rows="4" required></textarea>
+        <label>Description</label>
+    </div>
+
+    <button type="submit" name="submit" class="fancy-btn">Submit Complaint</button>
 </form>
 
 <h2>My Complaints</h2>
@@ -251,37 +363,42 @@ document.addEventListener("DOMContentLoaded", function(){
 <?php } ?>
 </table>
 
-<h2>Feedback</h2>
+<h2>Feedback from Admin</h2>
 <?php if(mysqli_num_rows($feedback_result) > 0){ ?>
 <table>
-<tr><th>Complaint</th><th>Rating</th><th>Comment</th></tr>
-<?php while($frow=mysqli_fetch_assoc($feedback_result)) { ?>
+<tr><th>Complaint</th><th>Admin Comment</th><th>Your Rating</th><th>Your Comment</th><th>Action</th></tr>
+<?php while($frow=mysqli_fetch_assoc($feedback_result)) { 
+    $alreadyRated = !is_null($frow['student_rating']); ?>
 <tr>
     <td><?php echo htmlspecialchars($frow['complaint_title']); ?></td>
-    <td><?php echo $frow['rating']; ?></td>
-    <td><?php echo nl2br(htmlspecialchars($frow['comment'])); ?></td>
+    <td><?php echo nl2br(htmlspecialchars($frow['admin_comment'] ?? '-')); ?></td>
+    <td><?php echo $alreadyRated ? $frow['student_rating'] : '-'; ?></td>
+    <td><?php echo $alreadyRated ? htmlspecialchars($frow['student_comment']) : '-'; ?></td>
+    <td>
+        <?php if(!$alreadyRated){ ?>
+        <form method="POST">
+            <input type="hidden" name="feedback_id" value="<?php echo $frow['feedback_id']; ?>">
+            <label>Rating (1-5):</label>
+            <input type="number" name="rating" min="1" max="5" required>
+            <label>Comment:</label>
+            <textarea name="comment" rows="2" required></textarea>
+            <input type="submit" name="submit_student_feedback" value="Submit Feedback">
+        </form>
+        <?php } else { echo 'Done'; } ?>
+    </td>
 </tr>
 <?php } ?>
 </table>
 <?php } else { echo "<p>No feedback yet.</p>"; } ?>
 
 </div>
-<form method="POST" action="logout.php" style="text-align:right; margin:10px;">
+
+<form method="POST" action="logout.php" class="logout-form">
     <button type="submit">Logout</button>
 </form>
-</body>
+
 <script>
 document.addEventListener("DOMContentLoaded", function(){
-
-    // Confirm submit
-    const form = document.querySelector('form[method="POST"]');
-    form.addEventListener('submit', function(e){
-        if(!confirm('Submit this complaint now?')){
-            e.preventDefault();
-        }
-    });
-
-    // Auto uppercase ticket input
     const ticketInput = document.querySelector('input[name="ticket"]');
     if(ticketInput){
         ticketInput.addEventListener('input', function(){
@@ -290,4 +407,5 @@ document.addEventListener("DOMContentLoaded", function(){
     }
 });
 </script>
+</body>
 </html>

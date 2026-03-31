@@ -1,75 +1,100 @@
 <?php
-include 'db.php';
 session_start();
+include 'db.php';
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 $message = "";
 
-// Check if login form submitted
+// Detect role from GET (from index.php buttons)
+$role = isset($_GET['role']) ? $_GET['role'] : '';
+
+if(!$role){
+    header("Location: index.php");
+    exit;
+}
+
+// If already logged in, redirect to their dashboard
+if(isset($_SESSION['role']) && $_SESSION['role'] === $role){
+    switch($role){
+        case 'admin':
+            header("Location: admin.php");
+            exit;
+        case 'staff':
+            header("Location: staff.php");
+            exit;
+        case 'student':
+            header("Location: student.php");
+            exit;
+    }
+}
+
 if(isset($_POST['login'])){
     $email = trim($_POST['email']);
     $password = trim($_POST['password']);
+    $code = isset($_POST['code']) ? trim($_POST['code']) : "";
 
-    if($email && $password){
-        // Prepare statement to prevent SQL injection
-        $stmt = $conn->prepare("SELECT id, password, name, role FROM users WHERE email=?");
-        $stmt->bind_param("s", $email);
+    // Check role-specific code if needed
+    if($role === "admin"){
+        $stmt = $conn->prepare("SELECT * FROM super_admin WHERE admin_code=? LIMIT 1");
+        $stmt->bind_param("s", $code);
         $stmt->execute();
-        $stmt->bind_result($id, $hashed, $name, $role);
+        $result = $stmt->get_result();
+        if($result->num_rows === 0){
+            $message = "Invalid Super Admin Code!";
+        }
+    } elseif($role === "staff"){
+        $stmt = $conn->prepare("SELECT * FROM super_staff WHERE staff_code=? LIMIT 1");
+        $stmt->bind_param("s", $code);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if($result->num_rows === 0){
+            $message = "Invalid Staff Code!";
+        }
+    }
 
-        // Fetch row and check
-        if($stmt->fetch()){
-            $role = strtolower(trim($role)); // normalize role to lowercase, remove spaces
+    // Only check login if code is valid or student
+    if(!$message){
+        $stmt = $conn->prepare("SELECT * FROM users WHERE email=? AND role=? LIMIT 1");
+        $stmt->bind_param("ss", $email, $role);
+        $stmt->execute();
+        $result = $stmt->get_result();
 
-            // Verify password
-            if(password_verify($password, $hashed)){
-                session_regenerate_id(true); // Prevent session hijacking
+        if($result->num_rows === 1){
+            $user = $result->fetch_assoc();
+            if(password_verify($password, $user['password'])){
+                // Set session variables
+                $_SESSION['user_id'] = $user['id'];
+                $_SESSION['user_name'] = $user['name'];
+                $_SESSION['role'] = $user['role'];
 
-                $_SESSION['user_id'] = $id;
-                $_SESSION['user_name'] = $name;
-                $_SESSION['role'] = $role;
-
-                // Role-based redirection
-                switch($role){
-                    case 'student':
-                        header("Location: student.php");
-                        break;
-                    case 'staff':
-                        header("Location: staff.php");
-                        break;
+                // Redirect based on role
+                switch($user['role']){
                     case 'admin':
                         header("Location: admin.php");
-                        break;
-                    default:
-                        session_unset();
-                        session_destroy();
-                        $message = "Invalid user role!";
-                        break;
+                        exit;
+                    case 'staff':
+                        header("Location: staff.php");
+                        exit;
+                    case 'student':
+                        header("Location: student.php");
+                        exit;
                 }
-                exit;
-
             } else {
-                $message = "Incorrect password!";
+                $message = "Incorrect Password!";
             }
-
         } else {
-            $message = "Email not registered!";
+            $message = "No account found with this email and role!";
         }
-
-        $stmt->close();
-
-    } else {
-        $message = "Fill all fields!";
     }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Login - KCAU Portal</title>
-
+<title><?php echo ucfirst($role); ?> Login - KCAU Portal</title>
 <style>
 body {
     font-family: 'Segoe UI', sans-serif;
@@ -78,140 +103,40 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: flex-start;
+    min-height: 100vh;
     margin: 0;
 }
-
-/* HEADER */
-.header {
-    text-align: center;
-    margin-top: 30px;
-}
-.logo {
-    width: 85px;
-}
-.header h2 {
-    color: #FFD700;
-    margin-top: 10px;
-}
-
-/* CONTAINER */
-.container {
-    background: #0f2a4d;
-    padding: 35px;
-    border-radius: 12px;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.8);
-    width: 360px;
-    margin-top: 20px;
-    border: 1px solid rgba(255, 215, 0, 0.2);
-}
-
-/* INPUT GROUP */
-.input-group {
-    position: relative;
-    margin-bottom: 25px;
-}
-
-.input-group input {
-    width: 100%;
-    padding: 12px;
-    border: 1px solid #1e3a5f;
-    border-radius: 6px;
-    background: #0b1e3c;
-    color: #fff;
-    outline: none;
-    transition: 0.3s;
-}
-
-.input-group input:focus {
-    border-color: #FFD700;
-    box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
-}
-
-/* FLOAT LABEL */
-.input-group label {
-    position: absolute;
-    top: 12px;
-    left: 12px;
-    color: #9ca3af;
-    font-size: 14px;
-    transition: 0.3s;
-    pointer-events: none;
-}
-
+.header { text-align: center; padding: 40px 20px 20px 20px; }
+.header img { width: 100px; }
+.header h1 { color: #FFD700; margin: 10px 0; font-size: 32px; }
+h2.page-title{ color: #FFD700; margin: 10px 0 20px 0; text-align: center; }
+.container { background: #0f2a4d; padding: 35px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); width: 360px; margin-top: 20px; border: 1px solid rgba(255, 215, 0, 0.2); }
+.input-group { position: relative; margin-bottom: 25px; }
+.input-group input { width: 100%; padding: 12px; border: 1px solid #1e3a5f; border-radius: 6px; background: #0b1e3c; color: #ffffff; outline: none; transition: 0.3s; }
+.input-group input:focus { border-color: #FFD700; box-shadow: 0 0 8px rgba(255, 215, 0, 0.4); }
+.input-group label { position: absolute; top: 12px; left: 12px; color: #9ca3af; font-size: 14px; transition: 0.3s; pointer-events: none; background: transparent; }
 .input-group input:focus + label,
-.input-group input:valid + label {
-    top: -8px;
-    left: 8px;
-    background: #0f2a4d;
-    padding: 0 5px;
-    font-size: 12px;
-    color: #FFD700;
-}
-
-/* BUTTON */
-button {
-    width: 100%;
-    padding: 12px;
-    background: #FFD700;
-    color: #001233;
-    border: none;
-    border-radius: 6px;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: 0.3s;
-}
-
-button:hover {
-    background: #e6c200;
-    box-shadow: 0 0 12px rgba(255, 215, 0, 0.6);
-}
-
-/* MESSAGE */
-.message {
-    text-align: center;
-    margin-bottom: 15px;
-    color: #ff4d4d;
-}
-
-/* TOGGLE */
-.toggle {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 20px;
-    color: #cbd5e1;
-}
-
-.toggle input {
-    accent-color: #FFD700;
-}
-
-/* LINKS */
-p {
-    text-align: center;
-}
-a {
-    color: #FFD700;
-    text-decoration: none;
-}
-a:hover {
-    text-decoration: underline;
-}
+.input-group input:valid + label { top: -8px; left: 8px; background: #0f2a4d; padding: 0 5px; font-size: 12px; color: #FFD700; }
+button { width: 100%; padding: 12px; background: #FFD700; color: #001233; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+button:hover { background: #e6c200; box-shadow: 0 0 12px rgba(255, 215, 0, 0.6); }
+.message { text-align: center; margin-bottom: 15px; color: #ff4d4d; }
+.toggle { display: flex; align-items: center; gap: 10px; font-size: 14px; margin-bottom: 20px; color: #cbd5e1; }
+.toggle input { accent-color: #FFD700; width: 18px; height: 18px; }
+p { text-align: center; }
+a { color: #FFD700; text-decoration: none; }
+a:hover { text-decoration: underline; }
 </style>
 </head>
-
 <body>
 
-<!-- HEADER -->
 <div class="header">
-    <img src="KCA_UNIVERSITY_LOGO.png" class="logo">
-    <h2>KCA Complaint System</h2>
+    <img src="KCA_UNIVERSITY_LOGO.png" class="logo" alt="KCAU Logo">
+    <h1>Login Portal</h1>
 </div>
 
-<!-- LOGIN BOX -->
 <div class="container">
-    <h2 style="text-align:center;">Login</h2>
+    <h2 class="page-title"><?php echo ucfirst($role); ?> Login</h2>
 
     <?php if($message) echo "<div class='message'>$message</div>"; ?>
 
@@ -227,22 +152,28 @@ a:hover {
             <label>Password</label>
         </div>
 
+        <?php if($role === 'admin' || $role === 'staff'): ?>
+        <div class="input-group">
+            <input type="text" name="code" required>
+            <label><?php echo $role === 'admin' ? 'Super Admin Code' : 'Staff Code'; ?></label>
+        </div>
+        <?php endif; ?>
+
         <div class="toggle">
             <input type="checkbox" onclick="togglePassword()">
             <span>Show Password</span>
         </div>
 
         <button type="submit" name="login">Login</button>
-
     </form>
 
-    <p>Don't have an account? <a href="register.php">Register</a></p>
+    <p>Don't have an account? <a href="register.php?role=<?php echo $role; ?>">Register Here</a></p>
 </div>
 
 <script>
-function togglePassword() {
-    let pass = document.getElementById("password");
-    pass.type = pass.type === "password" ? "text" : "password";
+function togglePassword(){
+    let pwd = document.getElementById("password");
+    pwd.type = (pwd.type === "password") ? "text" : "password";
 }
 </script>
 

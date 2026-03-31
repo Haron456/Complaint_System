@@ -138,6 +138,35 @@ table form {
     th, td { font-size: 14px; padding: 8px; }
     .header h1 { font-size: 20px; }
 }
+/* LOGOUT BUTTON - BOTTOM RIGHT POWER STYLE */
+.logout-form {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+}
+
+.logout-form button {
+    background: linear-gradient(135deg, #FFD700, #e6c200);
+    color: #001233;
+    border: none;
+    padding: 12px 18px;
+    border-radius: 10px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+    transition: all 0.3s ease;
+}
+
+/* HOVER EFFECT */
+.logout-form button:hover {
+    transform: scale(1.08);
+    box-shadow: 0 0 25px rgba(255, 215, 0, 0.9);
+}
+
+/* CLICK EFFECT */
+.logout-form button:active {
+    transform: scale(0.95);
+}
 </style>
 
 <script>
@@ -203,8 +232,16 @@ document.addEventListener("DOMContentLoaded", function(){
 </table>
 
 </div>
-<form method="POST" action="logout.php" style="text-align:right; margin:10px;">
+<form method="POST" action="logout.php" class="logout-form">
     <button type="submit">Logout</button>
 </form>
 </body>
 </html>
+
+
+
+
+
+
+
+
