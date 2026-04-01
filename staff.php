@@ -191,7 +191,6 @@ document.addEventListener("DOMContentLoaded", function(){
     <img src="KCA_UNIVERSITY_LOGO.png" class="logo">
     <h1>KCA Staff Dashboard</h1>
 </div>
-
 <div class="container">
 
 <h2>All Complaints</h2>

@@ -63,12 +63,10 @@ if(isset($_POST['login'])){
         if($result->num_rows === 1){
             $user = $result->fetch_assoc();
             if(password_verify($password, $user['password'])){
-                // Set session variables
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['user_name'] = $user['name'];
                 $_SESSION['role'] = $user['role'];
 
-                // Redirect based on role
                 switch($user['role']){
                     case 'admin':
                         header("Location: admin.php");
@@ -107,28 +105,145 @@ body {
     min-height: 100vh;
     margin: 0;
 }
+
+/* HOME BUTTON */
+.home-btn {
+    position: absolute;
+    top: 20px;
+    right: 25px;
+}
+
+.home-btn a {
+    text-decoration: none;
+    background: linear-gradient(135deg, #FFD700, #e6c200);
+    color: #001233;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-weight: bold;
+    box-shadow: 0 0 10px rgba(255,215,0,0.5);
+    transition: 0.3s;
+}
+
+.home-btn a:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 18px rgba(255,215,0,0.8);
+}
+
 .header { text-align: center; padding: 40px 20px 20px 20px; }
 .header img { width: 100px; }
 .header h1 { color: #FFD700; margin: 10px 0; font-size: 32px; }
-h2.page-title{ color: #FFD700; margin: 10px 0 20px 0; text-align: center; }
-.container { background: #0f2a4d; padding: 35px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); width: 360px; margin-top: 20px; border: 1px solid rgba(255, 215, 0, 0.2); }
+
+h2.page-title{
+    color: #FFD700;
+    margin: 10px 0 20px 0;
+    text-align: center;
+}
+
+.container {
+    background: #0f2a4d;
+    padding: 35px;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+    width: 360px;
+    margin-top: 20px;
+    border: 1px solid rgba(255, 215, 0, 0.2);
+}
+
 .input-group { position: relative; margin-bottom: 25px; }
-.input-group input { width: 100%; padding: 12px; border: 1px solid #1e3a5f; border-radius: 6px; background: #0b1e3c; color: #ffffff; outline: none; transition: 0.3s; }
-.input-group input:focus { border-color: #FFD700; box-shadow: 0 0 8px rgba(255, 215, 0, 0.4); }
-.input-group label { position: absolute; top: 12px; left: 12px; color: #9ca3af; font-size: 14px; transition: 0.3s; pointer-events: none; background: transparent; }
+
+.input-group input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #1e3a5f;
+    border-radius: 6px;
+    background: #0b1e3c;
+    color: #ffffff;
+    outline: none;
+    transition: 0.3s;
+}
+
+.input-group input:focus {
+    border-color: #FFD700;
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+}
+
+.input-group label {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    color: #9ca3af;
+    font-size: 14px;
+    transition: 0.3s;
+    pointer-events: none;
+}
+
 .input-group input:focus + label,
-.input-group input:valid + label { top: -8px; left: 8px; background: #0f2a4d; padding: 0 5px; font-size: 12px; color: #FFD700; }
-button { width: 100%; padding: 12px; background: #FFD700; color: #001233; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; }
-button:hover { background: #e6c200; box-shadow: 0 0 12px rgba(255, 215, 0, 0.6); }
-.message { text-align: center; margin-bottom: 15px; color: #ff4d4d; }
-.toggle { display: flex; align-items: center; gap: 10px; font-size: 14px; margin-bottom: 20px; color: #cbd5e1; }
-.toggle input { accent-color: #FFD700; width: 18px; height: 18px; }
+.input-group input:valid + label {
+    top: -8px;
+    left: 8px;
+    background: #0f2a4d;
+    padding: 0 5px;
+    font-size: 12px;
+    color: #FFD700;
+}
+
+button {
+    width: 100%;
+    padding: 12px;
+    background: #FFD700;
+    color: #001233;
+    border: none;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+button:hover {
+    background: #e6c200;
+    box-shadow: 0 0 12px rgba(255, 215, 0, 0.6);
+}
+
+.message {
+    text-align: center;
+    margin-bottom: 15px;
+    color: #ff4d4d;
+}
+
+.toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    margin-bottom: 20px;
+    color: #cbd5e1;
+}
+
+.toggle input {
+    accent-color: #FFD700;
+    width: 18px;
+    height: 18px;
+}
+
 p { text-align: center; }
-a { color: #FFD700; text-decoration: none; }
-a:hover { text-decoration: underline; }
+
+a {
+    color: #FFD700;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
 </style>
 </head>
 <body>
+
+<!-- HOME BUTTON -->
+<div class="home-btn">
+    <a href="index.php">Home</a>
+</div>
 
 <div class="header">
     <img src="KCA_UNIVERSITY_LOGO.png" class="logo" alt="KCAU Logo">

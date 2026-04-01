@@ -89,27 +89,92 @@ body {
     align-items: center;
     margin: 0;
 }
+
+/* HOME BUTTON */
+.home-btn {
+    position: absolute;
+    top: 20px;
+    right: 25px;
+}
+
+.home-btn a {
+    text-decoration: none;
+    background: linear-gradient(135deg, #FFD700, #e6c200);
+    color: #001233;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-weight: bold;
+    box-shadow: 0 0 10px rgba(255,215,0,0.5);
+    transition: 0.3s;
+}
+
+.home-btn a:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 18px rgba(255,215,0,0.8);
+}
+
 .header { text-align:center; margin-top:30px; }
 .logo { width:85px; }
 .header h2 { color:#FFD700; margin-top:10px; }
+
 .container {
     background:#0f2a4d; padding:35px; border-radius:12px;
     box-shadow:0 10px 40px rgba(0,0,0,0.8);
     width:360px; margin-top:20px; border:1px solid rgba(255,215,0,0.2);
 }
+
 .input-group { position:relative; margin-bottom:25px; }
 .input-group input { width:100%; padding:12px; border:1px solid #1e3a5f; border-radius:6px; background:#0b1e3c; color:#fff; }
-.input-group label { position:absolute; top:12px; left:12px; color:#9ca3af; font-size:14px; transition:0.3s; pointer-events:none; }
+
+.input-group label {
+    position:absolute; top:12px; left:12px;
+    color:#9ca3af; font-size:14px;
+    transition:0.3s; pointer-events:none;
+}
+
 .input-group input:focus + label,
-.input-group input:valid + label { top:-8px; left:8px; background:#0f2a4d; padding:0 5px; font-size:12px; color:#FFD700; }
-button { width:100%; padding:12px; background:#FFD700; color:#001233; border:none; border-radius:6px; font-weight:bold; cursor:pointer; }
+.input-group input:valid + label {
+    top:-8px; left:8px;
+    background:#0f2a4d;
+    padding:0 5px;
+    font-size:12px;
+    color:#FFD700;
+}
+
+button {
+    width:100%; padding:12px;
+    background:#FFD700;
+    color:#001233;
+    border:none;
+    border-radius:6px;
+    font-weight:bold;
+    cursor:pointer;
+}
+
 button:hover { background:#e6c200; }
-.message { text-align:center; margin-bottom:15px; color:#ff4d4d; }
-.toggle { display:flex; align-items:center; gap:10px; margin-bottom:20px; }
+
+.message {
+    text-align:center;
+    margin-bottom:15px;
+    color:#ff4d4d;
+}
+
+.toggle {
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:20px;
+}
+
 a { color:#FFD700; }
 </style>
 </head>
 <body>
+
+<!-- HOME BUTTON -->
+<div class="home-btn">
+    <a href="index.php">Home</a>
+</div>
 
 <div class="header">
     <img src="KCA_UNIVERSITY_LOGO.png" class="logo">
