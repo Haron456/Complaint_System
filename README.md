@@ -1,265 +1,101 @@
+# KCA University Complaint and Feedback Management System
 
-
-# KCA Complaint Management System
-
-## Overview
-
-The KCA Complaint Management System is a web-based application developed using PHP and MySQL.
-It is designed to improve how complaints are submitted, managed, and resolved within an institution.
-
-The system provides a structured workflow where:
-
-* Students submit complaints
-* Staff manage and update complaint status
-* Administrators respond with feedback and notifications
-
----
-
-## Purpose
-
-The purpose of this system is to enhance communication between students and administration by providing a transparent, efficient, and trackable complaint handling process.
-
----
+A web-based system where students lodge complaints, staff handle them, and the administrator assigns, monitors and reports on them. Built with PHP, MySQL, HTML, CSS and JavaScript.
 
 ## Features
 
-### Student (User)
+- Student registration and one login for students, staff and administrators
+- Complaints with department, category, optional attachment (PDF, JPG, PNG, up to 2 MB) and a reference number
+- Seven-stage workflow with full status history
+- Assignment and reassignment by the administrator
+- Replies to the student and internal staff notes
+- Priority levels, automatic escalation and manual escalation to senior staff
+- In-app notifications and email notifications
+- Service rating from 1 to 5 once a complaint is resolved
+- Reports with charts, CSV export and print to PDF
+- User management, escalation settings and an activity log for the administrator
+- Database backup script
 
-* Secure registration and login
-* Submit complaints
-* Automatic ticket generation (e.g., TICK-0001)
-* Track complaint status
-* View admin feedback
-* Submit ratings and comments
+## Requirements
 
----
+- PHP 7.4 or higher (PHP 8 recommended) with the `mysqli` extension
+- MySQL 5.7+ or MariaDB
+- Apache (XAMPP recommended)
+- Composer, only to install PHPMailer for email
 
-### Staff
+## Setup (XAMPP on Linux)
 
-* View all complaints
-* Update complaint status (Pending / Resolved)
+1. Copy this folder to `/opt/lampp/htdocs/complaint_system`.
+2. Start Apache and MySQL: `sudo /opt/lampp/lampp start`.
+3. In phpMyAdmin, choose **Import** and import `database/schema.sql`. If an old `complaint_system` database exists, export it first and drop it.
+4. Copy `config/config.sample.php` to `config/config.php` and fill in the database and email settings.
+5. Install the email library: `composer install`.
+6. Let the web server write attachments: `sudo chgrp daemon uploads && sudo chmod 775 uploads`.
+7. Open `http://localhost/complaint_system/install.php`, create the first administrator, then **delete `install.php`**.
+8. Log in at `http://localhost/complaint_system/`.
 
----
+On Windows, XAMPP is at `C:\xampp\htdocs\complaint_system`, and the upload folder needs no permission change.
 
-### Admin
+## First steps
 
-* View all complaints
-* Update complaint status
-* Provide feedback (comments)
-* Send email notifications to users upon feedback submission
-* View student ratings and comments
-* Dashboard with analytics:
+1. Log in as the administrator and open **Users**.
+2. Add staff accounts. Staff need a department. Tick **Senior staff member** for people who receive escalated complaints, and make sure every department has one.
+3. A new account's first password is the person's own ID in capital letters. They must change it at first login.
+4. Students register themselves on the **Register** page.
 
-  * Total complaints
-  * Complaints by status
-  * Feedback count
-  * Average response time
-* Monitor complaint trends through analytics
+## Configuration (`config/config.php`)
 
----
+| Setting | Purpose |
+| --- | --- |
+| `db` | Database host, user, password and name |
+| `session_timeout` | Automatic logout after this many seconds (1800 = 30 minutes) |
+| `debug` | `true` shows PHP errors on screen. Keep `false` on a live server |
+| `base_url` | Web address used for links inside emails |
+| `mail` | Gmail SMTP settings. Use a Gmail **app password**, never the normal password |
 
-## System Requirements
-
-* PHP 7.4 or higher
-* MySQL 5.7 or higher
-* Apache Web Server (XAMPP recommended)
-* Composer (for PHPMailer)
-
----
-
-## Database Setup
-
-1. Open phpMyAdmin
-2. Create a database named:
-
-```
-complaint_system
-```
-
-3. Import the SQL file provided in the project:
-
-   * Select the database
-   * Click **Import**
-   * Choose the `.sql` file
-   * Click **Go**
-
----
-
-## Database Tables
-
-The system includes the following tables:
-
-* users
-* complaints
-* feedback
-* super_admin
-* super_staff
-
-**Note:**
-If your code references additional tables (e.g., `staff_codes`), ensure they exist or update the code accordingly.
-
----
-
-## Installation
-
-1. Start Apache and MySQL in XAMPP
-
-2. Copy the project folder into:
+## Folder layout
 
 ```
-C:\xampp\htdocs\
+index.php  login.php  register.php  logout.php  change_password.php  install.php
+student.php  staff.php  admin.php  complaint.php  notifications.php  download.php
+admin_users.php  admin_settings.php  admin_reports.php  admin_activity.php
+cron_escalate.php
+includes/   bootstrap.php  helpers.php  complaints.php  mailer.php  uploads.php  header.php  footer.php
+config/     config.sample.php  config.php (not committed)
+database/   schema.sql  backup.sh
+assets/     css/style.css  logo.png
+uploads/    complaint attachments (not committed, blocked from direct web access)
 ```
 
-3. Open your browser and navigate to:
+## Scheduled jobs (optional)
+
+Add these lines with `crontab -e`:
 
 ```
-http://localhost/your-folder-name/
+0 * * * *  /opt/lampp/bin/php /opt/lampp/htdocs/complaint_system/cron_escalate.php >> /tmp/escalate.log 2>&1
+0 2 * * *  /opt/lampp/htdocs/complaint_system/database/backup.sh >> /tmp/backup.log 2>&1
 ```
 
----
+The first escalates overdue complaints every hour. The second backs up the database every night.
 
-## Configuration
+## Backup and restore
 
-Open `db.php` and configure your database connection:
+`database/backup.sh` saves a compressed copy in `~/complaint_system_backups` and keeps 14 days.
 
-```php
-$conn = new mysqli("localhost", "root", "", "complaint_system");
-```
-
----
-
-## Email Configuration (PHPMailer)
-
-To enable email notifications:
-
-1. Install PHPMailer using Composer:
+To restore a copy into an empty database:
 
 ```
-composer require phpmailer/phpmailer
+gunzip < BACKUPFILE.sql.gz | /opt/lampp/bin/mysql -u root complaint_system
 ```
 
-2. Update email credentials in `admin.php`:
+## Security notes
 
-```php
-$mail->Username = 'your-email@gmail.com';
-$mail->Password = 'your-app-password';
-```
+- Every database query is prepared, all output is escaped, and every form carries a CSRF token.
+- Passwords are stored hashed. People are logged out after 30 minutes without activity.
+- Attachments are checked by their contents, saved under random names, and served only through `download.php` to people allowed to see the complaint.
+- `config/config.php` holds the database login and the email password and is excluded from Git. Never commit it.
+- On a live server: set `'debug' => false`, use HTTPS, use a database user with limited rights instead of `root`, and delete `install.php`.
 
-**Important:**
+## Documentation
 
-* Use a Gmail App Password (not your actual password)
-* Ensure SMTP settings are correct
-* Internet connection is required
-
----
-
-## Project Structure
-
-```
-/project-folder
-│── index.php
-│── login.php
-│── register.php
-│── student.php
-│── staff.php
-│── admin.php
-│── logout.php
-│── db.php
-│── complaint_system.sql
-│── /vendor
-│── /assets
-```
-
----
-
-## Version Control
-
-This project is managed using Git.
-
-**Notes:**
-
-* The `vendor/` directory should be excluded using `.gitignore`
-* To install dependencies on a new machine, run:
-
-```
-composer install
-```
-
----
-
-## Security Considerations
-
-The system includes basic security practices such as:
-
-* Session-based authentication
-* Input validation and sanitization
-
-For production deployment, it is recommended to:
-
-* Use prepared statements for all database queries
-* Implement secure password hashing (`password_hash`)
-* Enable HTTPS
-* Restrict access to sensitive files
-* Avoid exposing credentials in source code
-
----
-
-## Common Issues
-
-### Too Many Redirects
-
-* Ensure session roles are correctly set
-* Clear browser cookies
-* Verify login redirection logic
-
----
-
-### Missing Table Error
-
-Example:
-
-```
-Table 'complaint_system.staff_codes' doesn't exist
-```
-
-**Solution:**
-
-* Re-import the SQL file
-* Create the missing table
-* Or update the code to match existing tables
-
----
-
-### Email Not Sending
-
-* Check internet connection
-* Verify SMTP credentials
-* Ensure App Password is used
-* Confirm Composer dependencies are installed
-
----
-
-## Future Improvements
-
-Potential enhancements for the system include:
-
-* Role-based access control with finer permissions
-* Real-time notifications
-* File attachments for complaints
-* Advanced reporting (PDF/Excel export)
-* Improved user interface and user experience
-
----
-
-## Notes
-
-* Always start Apache and MySQL before running the system
-* Import the database before accessing the application
-* Keep credentials secure
-
----
-
-## Author
-
-Munga Brandon Billy — Student at KCA University
-
+The user manual covers students, staff and administrators.

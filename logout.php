@@ -1,7 +1,12 @@
 <?php
-session_start();
-session_unset();   // remove all session variables
-session_destroy(); // destroy the session
-header("Location: index.php"); // go back to home page
-exit;
-?>
+require __DIR__ . '/includes/bootstrap.php';
+
+// Logging out is a POST with a CSRF token so another site cannot log people out.
+if (is_post() && ($user = current_user())) {
+    csrf_check();
+    log_activity($conn, $user['id'], 'logout', '');
+    $_SESSION = [];
+    session_regenerate_id(true);
+    flash('success', 'You have been logged out.');
+}
+redirect('login.php');

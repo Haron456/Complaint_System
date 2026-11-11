@@ -1,411 +1,206 @@
 <?php
-session_start();
-include 'db.php';
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+/**
+ * Student dashboard: submit a complaint (with an optional attachment), track by
+ * reference number, and see the list of own complaints with their status.
+ */
+require __DIR__ . '/includes/bootstrap.php';
+$user = require_role('student');
 
-// --------------------
-// Redirect if not logged in as student
-// --------------------
-if(!isset($_SESSION['role']) || $_SESSION['role'] !== 'student'){
-    header("Location: login.php?role=student");
-    exit;
-}
+$departments = fetch_all($conn, 'SELECT department_id, department_name FROM departments ORDER BY department_name');
+$categories = fetch_all($conn, 'SELECT category_id, category_name FROM categories ORDER BY category_name');
+$deptIds = array_map('intval', array_column($departments, 'department_id'));
+$catIds = array_map('intval', array_column($categories, 'category_id'));
 
-// Set user_id and user_name safely
-$user_id = intval($_SESSION['user_id'] ?? 0);
-$user_name = htmlspecialchars($_SESSION['user_name'] ?? '');
+$errors = [];
+$old = ['department_id' => 0, 'category_id' => 0, 'title' => '', 'description' => ''];
 
-// --------------------
-// Handle new complaint
-// --------------------
-if(isset($_POST['submit'])){
-    $title = trim($_POST['title']);
-    $description = trim($_POST['description']);
+// ---- Submit a complaint ----
+if (is_post() && ($_POST['action'] ?? '') === 'submit_complaint') {
+    csrf_check();
+    $old['department_id'] = (int)($_POST['department_id'] ?? 0);
+    $old['category_id'] = (int)($_POST['category_id'] ?? 0);
+    $old['title'] = trim($_POST['title'] ?? '');
+    $old['description'] = trim($_POST['description'] ?? '');
 
-    if($title !== "" && $description !== ""){
-        $stmt = $conn->prepare("INSERT INTO complaints (user_id, title, description) VALUES (?, ?, ?)");
-        $stmt->bind_param("iss", $user_id, $title, $description);
-        $stmt->execute();
+    if (!in_array($old['department_id'], $deptIds, true)) {
+        $errors[] = 'Choose the department concerned.';
+    }
+    if (!in_array($old['category_id'], $catIds, true)) {
+        $errors[] = 'Choose a complaint category.';
+    }
+    if ($old['title'] === '' || mb_strlen($old['title']) > 150) {
+        $errors[] = 'Enter a short title (up to 150 characters).';
+    }
+    if ($old['description'] === '' || mb_strlen($old['description']) > 5000) {
+        $errors[] = 'Describe the complaint (up to 5000 characters).';
+    }
 
-        $ticket_id = $stmt->insert_id;
-        $ticket = "TICK-".str_pad($ticket_id,4,"0",STR_PAD_LEFT);
-        $stmt->close();
+    // Optional attachment: checked now, saved only if everything else is valid.
+    $stored = null;
+    [$upload, $uploadError] = check_attachment($_FILES['attachment'] ?? null);
+    if ($uploadError) {
+        $errors[] = $uploadError;
+    }
+    if (!$errors && $upload) {
+        $stored = store_attachment($upload);
+        if ($stored === null) {
+            $errors[] = 'The file could not be saved on the server. Please try again, or submit without the file.';
+        }
+    }
 
-        echo "<script>alert('Complaint submitted! Your Ticket: $ticket'); window.location.href='student.php';</script>";
-        exit;
-    } else {
-        echo "<script>alert('Enter a valid title and description');</script>";
+    if (!$errors) {
+        $placeholder = 'TMP-' . bin2hex(random_bytes(6));   // replaced below once the ID is known
+        $conn->begin_transaction();
+        try {
+            db_execute(
+                $conn,
+                'INSERT INTO complaints (ticket_number, user_id, department_id, category_id, title, description, attachment, attachment_name)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                'siiissss',
+                [$placeholder, $user['id'], $old['department_id'], $old['category_id'], $old['title'], $old['description'], $stored, $upload['original'] ?? null]
+            );
+            $complaintId = (int)$conn->insert_id;
+            $ticket = 'TICK-' . str_pad((string)$complaintId, 4, '0', STR_PAD_LEFT);
+            db_execute($conn, 'UPDATE complaints SET ticket_number = ? WHERE complaint_id = ?', 'si', [$ticket, $complaintId]);
+
+            add_status_history($conn, $complaintId, null, 'Submitted', $user['id'], 'Complaint submitted');
+            notify($conn, $user['id'], $complaintId, sprintf('We have received your complaint. Reference number: %s.', $ticket));
+            foreach (fetch_all($conn, "SELECT user_id FROM users WHERE role = 'admin' AND is_active = 1") as $adm) {
+                notify($conn, (int)$adm['user_id'], $complaintId, sprintf('New complaint %s needs to be assigned.', $ticket));
+            }
+            log_activity($conn, $user['id'], 'complaint_submitted', $ticket);
+            $conn->commit();
+        } catch (Throwable $ex) {
+            $conn->rollback();
+            if ($stored !== null) {
+                delete_attachment($stored);   // do not leave an orphan file behind
+            }
+            throw $ex;
+        }
+
+        // Saved successfully: confirm by email.
+        email_user(
+            $conn,
+            $user['id'],
+            sprintf('Complaint %s received', $ticket),
+            sprintf('We have received your complaint "%s". Your reference number is %s. You will be notified by email and in the system as it progresses.', $old['title'], $ticket),
+            $complaintId
+        );
+
+        flash('success', sprintf('Your complaint has been received. Reference number: %s. You can track it from your dashboard.', $ticket));
+        redirect('student.php');
     }
 }
 
-// --------------------
-// Handle student feedback
-// --------------------
-if(isset($_POST['submit_student_feedback'])){
-    $feedback_id = intval($_POST['feedback_id']);
-    $rating = intval($_POST['rating']);
-    $comment = trim($_POST['comment']);
-
-    $stmt = $conn->prepare("UPDATE feedback SET student_rating=?, student_comment=? WHERE id=?");
-    $stmt->bind_param("isi", $rating, $comment, $feedback_id);
-    $stmt->execute();
-    $stmt->close();
-
-    echo "<script>alert('Your feedback has been submitted!'); window.location.href='student.php';</script>";
-    exit;
+// ---- Track by reference number ----
+$trackMessage = '';
+if (isset($_GET['ticket']) && trim($_GET['ticket']) !== '') {
+    $ticketSearch = strtoupper(trim($_GET['ticket']));
+    $found = fetch_one($conn, 'SELECT complaint_id FROM complaints WHERE ticket_number = ? AND user_id = ?', 'si', [$ticketSearch, $user['id']]);
+    if ($found) {
+        redirect('complaint.php?id=' . (int)$found['complaint_id']);
+    }
+    $trackMessage = 'No complaint of yours was found with that reference number.';
 }
 
-// --------------------
-// Track complaint by ticket
-// --------------------
-$search_result = null;
-if(isset($_GET['ticket'])){
-    $ticket_input = str_replace("TICK-", "", strtoupper($_GET['ticket']));
-    $ticket_id = intval($ticket_input);
+// ---- Own complaints ----
+$complaints = fetch_all(
+    $conn,
+    'SELECT c.complaint_id, c.ticket_number, c.title, c.status, c.priority, c.created_at,
+            d.department_name, cat.category_name, f.feedback_id
+     FROM complaints c
+     JOIN departments d ON d.department_id = c.department_id
+     JOIN categories cat ON cat.category_id = c.category_id
+     LEFT JOIN feedback f ON f.complaint_id = c.complaint_id
+     WHERE c.user_id = ?
+     ORDER BY c.created_at DESC, c.complaint_id DESC',
+    'i',
+    [$user['id']]
+);
 
-    $stmt = $conn->prepare("SELECT * FROM complaints WHERE id=? AND user_id=?");
-    $stmt->bind_param("ii", $ticket_id, $user_id);
-    $stmt->execute();
-    $search_result = $stmt->get_result();
-    $stmt->close();
-}
-
-// --------------------
-// Fetch user complaints
-// --------------------
-$stmt = $conn->prepare("SELECT * FROM complaints WHERE user_id=? ORDER BY date_created DESC");
-$stmt->bind_param("i", $user_id);
-$stmt->execute();
-$complaints_result = $stmt->get_result();
-$stmt->close();
-
-// --------------------
-// Fetch feedback
-// --------------------
-$stmt = $conn->prepare("
-    SELECT f.id AS feedback_id, f.admin_comment, f.student_rating, f.student_comment, c.title AS complaint_title
-    FROM feedback f
-    INNER JOIN complaints c ON f.complaint_id = c.id
-    WHERE c.user_id=?
-    ORDER BY f.id DESC
-");
-$stmt->bind_param("i", $user_id);
-$stmt->execute();
-$feedback_result = $stmt->get_result();
-$stmt->close();
+$pageTitle = 'Student dashboard';
+require __DIR__ . '/includes/header.php';
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>Student Portal</title>
-<style>
-/* Base */
-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #0a0f2c, #111a3a);
-    color: #fff;
-    margin: 0;
-    padding: 0;
-}
+<h1>Welcome, <?= e($user['name']) ?></h1>
 
-/* Header */
-.header {
-    background: #0d2a66;
-    padding: 20px;
-    text-align: center;
-    border-bottom: 3px solid gold;
-}
-
-.header h1 {
-    margin: 0;
-    color: gold;
-}
-
-.username {
-    color: #ffd700cc;
-    font-size: 18px;
-    margin-top: 5px;
-}
-
-/* Main container */
-.container {
-    width: 60%;
-    margin: 40px auto;
-    background: #162447;
-    padding: 30px;
-    border-radius: 12px;
-    box-shadow: 0px 0px 20px rgba(0,0,0,0.5);
-}
-
-/* Section titles */
-h2 {
-    color: gold;
-    border-bottom: 2px solid gold;
-    padding-bottom: 5px;
-}
-
-/* Inputs */
-input, textarea {
-    width: 100%;
-    padding: 12px;
-    margin-top: 10px;
-    margin-bottom: 15px;
-    border-radius: 8px;
-    border: none;
-    outline: none;
-    background: #1f4068;
-    color: white;
-}
-
-input::placeholder,
-textarea::placeholder {
-    color: #bbb;
-}
-
-/* Buttons */
-button {
-    background: gold;
-    color: #000;
-    padding: 10px 20px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: bold;
-    transition: 0.3s;
-}
-
-button:hover {
-    background: #ffd700cc;
-    transform: scale(1.05);
-}
-
-/* Complaint table */
-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 20px;
-}
-
-table th, table td {
-    padding: 10px;
-    border-bottom: 1px solid #ccc;
-    text-align: left;
-}
-
-table th {
-    background: #1f4068;
-    color: gold;
-}
-
-.status-pending { color: orange; font-weight: bold; }
-.status-resolved { color: limegreen; font-weight: bold; }
-.status-rejected { color: red; font-weight: bold; }
-
-/* LOGOUT BUTTON - BOTTOM RIGHT POWER STYLE */
-.logout-form {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-}
-
-.logout-form button {
-    background: linear-gradient(135deg, #FFD700, #e6c200);
-    color: #001233;
-    border: none;
-    padding: 12px 18px;
-    border-radius: 10px;
-    font-weight: bold;
-    cursor: pointer;
-    box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
-    transition: all 0.3s ease;
-}
-
-.logout-form button:hover {
-    transform: scale(1.08);
-    box-shadow: 0 0 25px rgba(255, 215, 0, 0.9);
-}
-
-.logout-form button:active {
-    transform: scale(0.95);
-}
-
-/* Fancy form input group */
-.fancy-form .input-group {
-    position: relative;
-    margin-bottom: 20px;
-}
-
-.fancy-form .input-group input,
-.fancy-form .input-group textarea {
-    width: 100%;
-    padding: 14px 12px;
-    border-radius: 10px;
-    border: 1px solid #1f4068;
-    background: #0b1e3c;
-    color: #fff;
-    outline: none;
-    transition: all 0.3s ease;
-    resize: none;
-}
-
-.fancy-form .input-group input:focus,
-.fancy-form .input-group textarea:focus {
-    border-color: #FFD700;
-    box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
-}
-
-.fancy-form .input-group label {
-    position: absolute;
-    top: 14px;
-    left: 12px;
-    color: #9ca3af;
-    font-size: 14px;
-    pointer-events: none;
-    background: transparent;
-    transition: all 0.3s ease;
-}
-
-.fancy-form .input-group input:focus + label,
-.fancy-form .input-group input:valid + label,
-.fancy-form .input-group textarea:focus + label,
-.fancy-form .input-group textarea:valid + label {
-    top: -8px;
-    left: 10px;
-    background: #162447;
-    padding: 0 6px;
-    font-size: 12px;
-    color: #FFD700;
-}
-
-/* Fancy submit button */
-.fancy-form .fancy-btn {
-    width: 100%;
-    padding: 14px;
-    border-radius: 12px;
-    border: none;
-    background: linear-gradient(135deg, #FFD700, #e6c200);
-    color: #001233;
-    font-weight: bold;
-    font-size: 16px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
-}
-
-.fancy-form .fancy-btn:hover {
-    background: linear-gradient(135deg, #ffe566, #e6c200);
-    transform: scale(1.05);
-    box-shadow: 0 0 25px rgba(255, 215, 0, 0.9);
-}
-
-.fancy-form .fancy-btn:active {
-    transform: scale(0.95);
-}
-</style>
-</head>
-<body>
-
-<div class="header">
-    <img src="KCA_UNIVERSITY_LOGO.png" class="logo">
-    <h1>KCA Complaint System</h1>
-    <div class="username">Welcome <?php echo $user_name; ?></div>
+<div class="card">
+    <h3>Track a complaint</h3>
+    <form method="get" class="inline-controls">
+        <input type="text" name="ticket" placeholder="Reference number, e.g. TICK-0001" value="<?= e($_GET['ticket'] ?? '') ?>" required style="min-width:260px">
+        <button type="submit">Check status</button>
+    </form>
+    <?php if ($trackMessage): ?><p style="color:var(--bad)"><?= e($trackMessage) ?></p><?php endif; ?>
 </div>
 
-<div class="container">
-<h2>Track Complaint</h2>
-<form method="GET">
-    <label>Enter Ticket Number:</label>
-    <input type="text" name="ticket" placeholder="e.g. TICK-0001" required>
-    <button type="submit">Check Status</button>
-</form>
-
-<?php if($search_result && mysqli_num_rows($search_result) > 0){ 
-    $row = mysqli_fetch_assoc($search_result); ?>
-<div style="margin-top:15px; padding:15px; background:#1f4068; border-radius:8px;">
-    <strong>Result:</strong><br>
-    Ticket: <?php echo "TICK-".str_pad($row['id'],4,"0",STR_PAD_LEFT); ?><br>
-    Title: <?php echo htmlspecialchars($row['title']); ?><br>
-    Status: <span class="status-<?php echo strtolower($row['status']); ?>"><?php echo ucfirst($row['status']); ?></span>
+<div class="card">
+    <h3>Submit a complaint</h3>
+    <?php if ($errors): ?>
+        <div class="alert alert-error"><ul><?php foreach ($errors as $err): ?><li><?= e($err) ?></li><?php endforeach; ?></ul></div>
+    <?php endif; ?>
+    <form method="post" enctype="multipart/form-data">
+        <?= csrf_field() ?>
+        <input type="hidden" name="action" value="submit_complaint">
+        <div class="form-row">
+            <div class="field">
+                <label for="department_id">Department concerned</label>
+                <select id="department_id" name="department_id" required>
+                    <option value="">- choose -</option>
+                    <?php foreach ($departments as $d): ?>
+                        <option value="<?= (int)$d['department_id'] ?>" <?= $old['department_id'] === (int)$d['department_id'] ? 'selected' : '' ?>><?= e($d['department_name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="field">
+                <label for="category_id">Category</label>
+                <select id="category_id" name="category_id" required>
+                    <option value="">- choose -</option>
+                    <?php foreach ($categories as $c): ?>
+                        <option value="<?= (int)$c['category_id'] ?>" <?= $old['category_id'] === (int)$c['category_id'] ? 'selected' : '' ?>><?= e($c['category_name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+        </div>
+        <div class="field">
+            <label for="title">Title</label>
+            <input type="text" id="title" name="title" value="<?= e($old['title']) ?>" maxlength="150" required>
+        </div>
+        <div class="field">
+            <label for="description">Description</label>
+            <textarea id="description" name="description" rows="5" maxlength="5000" required><?= e($old['description']) ?></textarea>
+        </div>
+        <div class="field">
+            <label for="attachment">Attachment (optional: PDF, JPG or PNG, up to 2 MB)</label>
+            <input type="file" id="attachment" name="attachment" accept=".pdf,.jpg,.jpeg,.png">
+        </div>
+        <button type="submit">Submit complaint</button>
+    </form>
 </div>
-<?php } elseif(isset($_GET['ticket'])){ ?>
-<p style="color:red;">No complaint found for that ticket.</p>
-<?php } ?>
 
-<h2>Submit Complaint</h2>
-<form method="POST" class="fancy-form">
-
-    <div class="input-group">
-        <input type="text" name="title" required>
-        <label>Title</label>
-    </div>
-
-    <div class="input-group">
-        <textarea name="description" rows="4" required></textarea>
-        <label>Description</label>
-    </div>
-
-    <button type="submit" name="submit" class="fancy-btn">Submit Complaint</button>
-</form>
-
-<h2>My Complaints</h2>
+<h2>My complaints (<?= count($complaints) ?>)</h2>
+<?php if (!$complaints): ?>
+    <p class="muted">You have not submitted any complaints yet.</p>
+<?php else: ?>
+<div class="table-wrap">
 <table>
-<tr><th>Ticket</th><th>Title</th><th>Description</th><th>Status</th><th>Date</th></tr>
-<?php while($row=mysqli_fetch_assoc($complaints_result)) { ?>
-<tr>
-    <td><?php echo "TICK-".str_pad($row['id'],4,"0",STR_PAD_LEFT); ?></td>
-    <td><?php echo htmlspecialchars($row['title']); ?></td>
-    <td><?php echo nl2br(htmlspecialchars($row['description'])); ?></td>
-    <td class="status-<?php echo strtolower($row['status']); ?>"><?php echo ucfirst($row['status']); ?></td>
-    <td><?php echo $row['date_created']; ?></td>
-</tr>
-<?php } ?>
+    <tr><th>Reference</th><th>Title</th><th>Department</th><th>Category</th><th>Status</th><th>Submitted</th><th></th></tr>
+    <?php foreach ($complaints as $c): ?>
+    <tr>
+        <td><a href="complaint.php?id=<?= (int)$c['complaint_id'] ?>"><?= e($c['ticket_number']) ?></a></td>
+        <td><?= e($c['title']) ?></td>
+        <td><?= e($c['department_name']) ?></td>
+        <td><?= e($c['category_name']) ?></td>
+        <td><span class="badge <?= e(badge_class($c['status'])) ?>"><?= e($c['status']) ?></span></td>
+        <td class="small muted"><?= e(format_date($c['created_at'])) ?></td>
+        <td>
+            <?php if (in_array($c['status'], ['Resolved', 'Closed'], true) && !$c['feedback_id']): ?>
+                <a class="btn btn-small" href="complaint.php?id=<?= (int)$c['complaint_id'] ?>#rate">Rate service</a>
+            <?php else: ?>
+                <a class="btn btn-small btn-ghost" href="complaint.php?id=<?= (int)$c['complaint_id'] ?>">View</a>
+            <?php endif; ?>
+        </td>
+    </tr>
+    <?php endforeach; ?>
 </table>
-
-<h2>Feedback from Admin</h2>
-<?php if(mysqli_num_rows($feedback_result) > 0){ ?>
-<table>
-<tr><th>Complaint</th><th>Admin Comment</th><th>Your Rating</th><th>Your Comment</th><th>Action</th></tr>
-<?php while($frow=mysqli_fetch_assoc($feedback_result)) { 
-    $alreadyRated = !is_null($frow['student_rating']); ?>
-<tr>
-    <td><?php echo htmlspecialchars($frow['complaint_title']); ?></td>
-    <td><?php echo nl2br(htmlspecialchars($frow['admin_comment'] ?? '-')); ?></td>
-    <td><?php echo $alreadyRated ? $frow['student_rating'] : '-'; ?></td>
-    <td><?php echo $alreadyRated ? htmlspecialchars($frow['student_comment']) : '-'; ?></td>
-    <td>
-        <?php if(!$alreadyRated){ ?>
-        <form method="POST">
-            <input type="hidden" name="feedback_id" value="<?php echo $frow['feedback_id']; ?>">
-            <label>Rating (1-5):</label>
-            <input type="number" name="rating" min="1" max="5" required>
-            <label>Comment:</label>
-            <textarea name="comment" rows="2" required></textarea>
-            <input type="submit" name="submit_student_feedback" value="Submit Feedback">
-        </form>
-        <?php } else { echo 'Done'; } ?>
-    </td>
-</tr>
-<?php } ?>
-</table>
-<?php } else { echo "<p>No feedback yet.</p>"; } ?>
-
 </div>
-
-<form method="POST" action="logout.php" class="logout-form">
-    <button type="submit">Logout</button>
-</form>
-
-<script>
-document.addEventListener("DOMContentLoaded", function(){
-    const ticketInput = document.querySelector('input[name="ticket"]');
-    if(ticketInput){
-        ticketInput.addEventListener('input', function(){
-            this.value = this.value.toUpperCase();
-        });
-    }
-});
-</script>
-</body>
-</html>
+<?php endif; ?>
+<?php require __DIR__ . '/includes/footer.php'; ?>

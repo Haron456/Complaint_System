@@ -1,296 +1,79 @@
 <?php
-session_start();
-include 'db.php';
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+/**
+ * Single login for students, staff and administrators.
+ * The role comes from the account, so each person lands on their own dashboard.
+ */
+require __DIR__ . '/includes/bootstrap.php';
 
-$message = "";
-
-// Detect role from GET (from index.php buttons)
-$role = isset($_GET['role']) ? $_GET['role'] : '';
-
-if(!$role){
-    header("Location: index.php");
-    exit;
+if ($user = current_user()) {
+    redirect(dashboard_for($user['role']));
 }
 
-// If already logged in, redirect to their dashboard
-if(isset($_SESSION['role']) && $_SESSION['role'] === $role){
-    switch($role){
-        case 'admin':
-            header("Location: admin.php");
-            exit;
-        case 'staff':
-            header("Location: staff.php");
-            exit;
-        case 'student':
-            header("Location: student.php");
-            exit;
+$error = '';
+$email = '';
+
+// Which portal was chosen on the home page. This only changes the wording; every role logs in the same way.
+$portals = [
+    'student' => ['Student portal', 'Log in to lodge complaints, follow them and rate the service.'],
+    'staff'   => ['Staff portal', 'Log in to handle the complaints assigned to you.'],
+    'admin'   => ['Administrator portal', 'Log in to assign complaints, manage users and read reports.'],
+];
+[$portalTitle, $portalText] = $portals[(string)($_GET['portal'] ?? '')] ?? ['Log in', 'Students, staff and administrators all log in here.'];
+
+if (is_post()) {
+    csrf_check();
+    $email = strtolower(trim($_POST['email'] ?? ''));
+    $password = (string)($_POST['password'] ?? '');
+
+    $account = fetch_one(
+        $conn,
+        'SELECT user_id, full_name, password_hash, role, is_active FROM users WHERE email = ? LIMIT 1',
+        's',
+        [$email]
+    );
+
+    if (!$account || !password_verify($password, $account['password_hash'])) {
+        // Same message for unknown email and wrong password, so accounts cannot be guessed.
+        $error = 'Incorrect email or password.';
+    } elseif (!(int)$account['is_active']) {
+        $error = 'This account has been deactivated. Please contact the administrator.';
+    } else {
+        session_regenerate_id(true);
+        $_SESSION['user_id'] = (int)$account['user_id'];
+        $_SESSION['user_name'] = $account['full_name'];
+        $_SESSION['role'] = $account['role'];
+        $_SESSION['last_activity'] = time();
+        log_activity($conn, (int)$account['user_id'], 'login', '');
+        redirect(dashboard_for($account['role']));
     }
 }
 
-if(isset($_POST['login'])){
-    $email = trim($_POST['email']);
-    $password = trim($_POST['password']);
-    $code = isset($_POST['code']) ? trim($_POST['code']) : "";
-
-    // Check role-specific code if needed
-    if($role === "admin"){
-        $stmt = $conn->prepare("SELECT * FROM super_admin WHERE admin_code=? LIMIT 1");
-        $stmt->bind_param("s", $code);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        if($result->num_rows === 0){
-            $message = "Invalid Super Admin Code!";
-        }
-    } elseif($role === "staff"){
-        $stmt = $conn->prepare("SELECT * FROM super_staff WHERE staff_code=? LIMIT 1");
-        $stmt->bind_param("s", $code);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        if($result->num_rows === 0){
-            $message = "Invalid Staff Code!";
-        }
-    }
-
-    // Only check login if code is valid or student
-    if(!$message){
-        $stmt = $conn->prepare("SELECT * FROM users WHERE email=? AND role=? LIMIT 1");
-        $stmt->bind_param("ss", $email, $role);
-        $stmt->execute();
-        $result = $stmt->get_result();
-
-        if($result->num_rows === 1){
-            $user = $result->fetch_assoc();
-            if(password_verify($password, $user['password'])){
-                $_SESSION['user_id'] = $user['id'];
-                $_SESSION['user_name'] = $user['name'];
-                $_SESSION['role'] = $user['role'];
-
-                switch($user['role']){
-                    case 'admin':
-                        header("Location: admin.php");
-                        exit;
-                    case 'staff':
-                        header("Location: staff.php");
-                        exit;
-                    case 'student':
-                        header("Location: student.php");
-                        exit;
-                }
-            } else {
-                $message = "Incorrect Password!";
-            }
-        } else {
-            $message = "No account found with this email and role!";
-        }
-    }
-}
+$pageTitle = 'Log in';
+require __DIR__ . '/includes/header.php';
 ?>
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title><?php echo ucfirst($role); ?> Login - KCAU Portal</title>
-<style>
-body {
-    font-family: 'Segoe UI', sans-serif;
-    background: linear-gradient(135deg, #0b1e3c, #001233);
-    color: #f1f5f9;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    min-height: 100vh;
-    margin: 0;
-}
-
-/* HOME BUTTON */
-.home-btn {
-    position: absolute;
-    top: 20px;
-    right: 25px;
-}
-
-.home-btn a {
-    text-decoration: none;
-    background: linear-gradient(135deg, #FFD700, #e6c200);
-    color: #001233;
-    padding: 10px 16px;
-    border-radius: 8px;
-    font-weight: bold;
-    box-shadow: 0 0 10px rgba(255,215,0,0.5);
-    transition: 0.3s;
-}
-
-.home-btn a:hover {
-    transform: scale(1.05);
-    box-shadow: 0 0 18px rgba(255,215,0,0.8);
-}
-
-.header { text-align: center; padding: 40px 20px 20px 20px; }
-.header img { width: 100px; }
-.header h1 { color: #FFD700; margin: 10px 0; font-size: 32px; }
-
-h2.page-title{
-    color: #FFD700;
-    margin: 10px 0 20px 0;
-    text-align: center;
-}
-
-.container {
-    background: #0f2a4d;
-    padding: 35px;
-    border-radius: 12px;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.8);
-    width: 360px;
-    margin-top: 20px;
-    border: 1px solid rgba(255, 215, 0, 0.2);
-}
-
-.input-group { position: relative; margin-bottom: 25px; }
-
-.input-group input {
-    width: 100%;
-    padding: 12px;
-    border: 1px solid #1e3a5f;
-    border-radius: 6px;
-    background: #0b1e3c;
-    color: #ffffff;
-    outline: none;
-    transition: 0.3s;
-}
-
-.input-group input:focus {
-    border-color: #FFD700;
-    box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
-}
-
-.input-group label {
-    position: absolute;
-    top: 12px;
-    left: 12px;
-    color: #9ca3af;
-    font-size: 14px;
-    transition: 0.3s;
-    pointer-events: none;
-}
-
-.input-group input:focus + label,
-.input-group input:valid + label {
-    top: -8px;
-    left: 8px;
-    background: #0f2a4d;
-    padding: 0 5px;
-    font-size: 12px;
-    color: #FFD700;
-}
-
-button {
-    width: 100%;
-    padding: 12px;
-    background: #FFD700;
-    color: #001233;
-    border: none;
-    border-radius: 6px;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: 0.3s;
-}
-
-button:hover {
-    background: #e6c200;
-    box-shadow: 0 0 12px rgba(255, 215, 0, 0.6);
-}
-
-.message {
-    text-align: center;
-    margin-bottom: 15px;
-    color: #ff4d4d;
-}
-
-.toggle {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 14px;
-    margin-bottom: 20px;
-    color: #cbd5e1;
-}
-
-.toggle input {
-    accent-color: #FFD700;
-    width: 18px;
-    height: 18px;
-}
-
-p { text-align: center; }
-
-a {
-    color: #FFD700;
-    text-decoration: none;
-}
-
-a:hover {
-    text-decoration: underline;
-}
-</style>
-</head>
-<body>
-
-<!-- HOME BUTTON -->
-<div class="home-btn">
-    <a href="index.php">Home</a>
-</div>
-
-<div class="header">
-    <img src="KCA_UNIVERSITY_LOGO.png" class="logo" alt="KCAU Logo">
-    <h1>Login Portal</h1>
-</div>
-
-<div class="container">
-    <h2 class="page-title"><?php echo ucfirst($role); ?> Login</h2>
-
-    <?php if($message) echo "<div class='message'>$message</div>"; ?>
-
-    <form method="POST">
-
-        <div class="input-group">
-            <input type="email" name="email" required>
-            <label>Email</label>
+<div class="card auth-box">
+    <h1><?= e($portalTitle) ?></h1>
+    <p class="muted"><?= e($portalText) ?></p>
+    <?php if (needs_admin_setup($conn)): ?>
+        <div class="alert alert-info">This system has no administrator yet. <a href="install.php">Set up the administrator account</a> first.</div>
+    <?php endif; ?>
+    <?php if ($error): ?><div class="alert alert-error"><?= e($error) ?></div><?php endif; ?>
+    <form method="post" autocomplete="on">
+        <?= csrf_field() ?>
+        <div class="field">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" value="<?= e($email) ?>" required autofocus>
         </div>
-
-        <div class="input-group">
-            <input type="password" name="password" id="password" required>
-            <label>Password</label>
+        <div class="field">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required>
         </div>
-
-        <?php if($role === 'admin' || $role === 'staff'): ?>
-        <div class="input-group">
-            <input type="text" name="code" required>
-            <label><?php echo $role === 'admin' ? 'Super Admin Code' : 'Staff Code'; ?></label>
+        <div class="check">
+            <input type="checkbox" id="show" onclick="document.getElementById('password').type = this.checked ? 'text' : 'password'">
+            <label for="show">Show password</label>
         </div>
-        <?php endif; ?>
-
-        <div class="toggle">
-            <input type="checkbox" onclick="togglePassword()">
-            <span>Show Password</span>
-        </div>
-
-        <button type="submit" name="login">Login</button>
+        <button type="submit" class="btn-block">Log in</button>
     </form>
-
-    <p>Don't have an account? <a href="register.php?role=<?php echo $role; ?>">Register Here</a></p>
+    <p class="small muted" style="text-align:center">Students: <a href="register.php">create an account</a>. Staff accounts are created by the administrator.</p>
 </div>
-
-<script>
-function togglePassword(){
-    let pwd = document.getElementById("password");
-    pwd.type = (pwd.type === "password") ? "text" : "password";
-}
-</script>
-
-</body>
-</html>
+<?php require __DIR__ . '/includes/footer.php'; ?>
