@@ -43,6 +43,16 @@ function format_date(?string $date): string
     return $date ? date('d M Y, H:i', strtotime($date)) : '-';
 }
 
+/** Up to two capital letters from a name, for people without a profile picture. */
+function initials(string $name): string
+{
+    $out = '';
+    foreach (array_slice(preg_split('/\s+/', trim($name)), 0, 2) as $part) {
+        $out .= mb_strtoupper(mb_substr($part, 0, 1));
+    }
+    return $out !== '' ? $out : '?';
+}
+
 /** Random temporary password that avoids look-alike characters. */
 function generate_temp_password(int $length = 10): string
 {
@@ -109,6 +119,7 @@ function current_user(): ?array
         'id'   => (int)$_SESSION['user_id'],
         'name' => (string)($_SESSION['user_name'] ?? ''),
         'role' => (string)($_SESSION['role'] ?? ''),
+        'avatar' => (string)($_SESSION['avatar'] ?? ''),
     ];
 }
 

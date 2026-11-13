@@ -53,12 +53,26 @@ $cssVersion = (int)@filemtime(BASE_PATH . '/assets/css/style.css');   // makes b
                     <a href="admin_activity.php"<?= $active('admin_activity.php') ?>>Activity log</a>
                 <?php endif; ?>
                 <a href="notifications.php"<?= $active('notifications.php') ?>>Notifications<?php if ($navUnread > 0): ?><span class="nav-badge"><?= (int)$navUnread ?></span><?php endif; ?></a>
-                <a href="change_password.php"<?= $active('change_password.php') ?>>Change password</a>
-                <span class="who"><?= e($navUser['name']) ?> (<?= e($navUser['role']) ?>)</span>
-                <form method="post" action="logout.php" class="inline-form">
-                    <?= csrf_field() ?>
-                    <button type="submit" class="link-btn">Logout</button>
-                </form>
+                <details class="user-menu">
+                    <summary>
+                        <?php if ($navUser['avatar'] !== ''): ?>
+                            <img class="avatar" src="avatar.php?v=<?= e(substr(md5($navUser['avatar']), 0, 8)) ?>" alt="">
+                        <?php else: ?>
+                            <span class="avatar avatar-initials"><?= e(initials($navUser['name'])) ?></span>
+                        <?php endif; ?>
+                        <span class="menu-name"><?= e($navUser['name']) ?></span>
+                        <span class="caret" aria-hidden="true"></span>
+                    </summary>
+                    <div class="menu-panel">
+                        <div class="menu-head"><strong><?= e($navUser['name']) ?></strong><span><?= e(ucfirst($navUser['role'])) ?></span></div>
+                        <a href="profile.php">My profile</a>
+                        <a href="change_password.php">Change password</a>
+                        <form method="post" action="logout.php">
+                            <?= csrf_field() ?>
+                            <button type="submit" class="link-btn">Logout</button>
+                        </form>
+                    </div>
+                </details>
             <?php else: ?>
                 <a href="index.php"<?= $active('index.php') ?>>Home</a>
                 <a href="login.php"<?= $active('login.php') ?>>Log in</a>
@@ -67,6 +81,7 @@ $cssVersion = (int)@filemtime(BASE_PATH . '/assets/css/style.css');   // makes b
         </nav>
     </div>
 </header>
+<script>document.addEventListener('click', function (e) { document.querySelectorAll('details.user-menu[open]').forEach(function (d) { if (!d.contains(e.target)) { d.removeAttribute('open'); } }); });</script>
 <main class="<?= !empty($wideLayout) ? 'wide' : '' ?>">
 <?php if ($flashMessages): ?>
 <div class="flash-wrap">

@@ -1,8 +1,11 @@
 <?php
 /**
  * Bootstrap - loaded at the top of every page.
+ *
  * Loads the configuration, starts a hardened session, connects to MySQL and
- * enforces the inactivity timeout and the active-account check.
+ * enforces two rules on every request:
+ *   - automatic logout after the inactivity timeout (NFR-09)
+ *   - the logged-in account must still exist and be active (FR-06)
  */
 define('BASE_PATH', dirname(__DIR__));
 
@@ -21,8 +24,9 @@ require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/complaints.php';
 require_once __DIR__ . '/mailer.php';
 require_once __DIR__ . '/uploads.php';
+require_once __DIR__ . '/avatars.php';
 
-// Friendly error page instead of a stack trace. Details go to the PHP error log.
+// Friendly error page instead of a stack trace (NFR-15). Details go to the PHP error log.
 set_exception_handler(function ($ex) use ($config) {
     error_log('Unhandled exception: ' . $ex->getMessage() . ' in ' . $ex->getFile() . ':' . $ex->getLine());
     http_response_code(500);
@@ -48,7 +52,6 @@ session_set_cookie_params([
     'httponly' => true,
     'samesite' => 'Lax',
 ]);
-
 if (!defined('NO_SESSION')) {
     session_start();
 }
@@ -71,7 +74,7 @@ if (!empty($_SESSION['user_id'])) {
     $expired = isset($_SESSION['last_activity']) && (time() - (int)$_SESSION['last_activity']) > $timeout;
     $row = $expired ? null : fetch_one(
         $conn,
-        'SELECT full_name, role, is_active, must_change_password FROM users WHERE user_id = ?',
+        'SELECT full_name, role, is_active, must_change_password, avatar FROM users WHERE user_id = ?',
         'i',
         [(int)$_SESSION['user_id']]
     );
@@ -89,6 +92,7 @@ if (!empty($_SESSION['user_id'])) {
     // Keep session values in step with the database (role or name may have changed).
     $_SESSION['user_name'] = $row['full_name'];
     $_SESSION['role'] = $row['role'];
+    $_SESSION['avatar'] = (string)($row['avatar'] ?? '');
     $_SESSION['must_change_password'] = (int)$row['must_change_password'];
     $_SESSION['last_activity'] = time();
 }
